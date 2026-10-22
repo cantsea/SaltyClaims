@@ -21,6 +21,9 @@ The plugin implements SQLite-backed root/child claims, selection tools, area all
 | `storage/SqliteStore.java` | Single SQLite connection, schema v1, transactional deltas, integrity checks, and backups. |
 | `selection/SelectionManager.java` | Transient corner/mode/resize state and bounded particle previews. |
 | `command/ClaimCommands.java` | Executable paths, per-path permission registration, help/completion, management, and confirmations. |
+| `command/DeleteConfirmations.java` | Sender-bound deletion snapshots, original permissions, and expiry without public tokens. |
+| `claim/ClaimTargets.java` | Owner/context/location resolution with explicit ambiguity checks. |
+| `message/HumanNames.java` | Player/world names and owner/bounds descriptions for outgoing identifiers. |
 | `protection/ProtectionListener.java` | Paper event adapters and cross-boundary checks. |
 | `config/Settings.java` | Validated immutable configuration loaded before replacement. |
 | `config/ConfigFiles.java` | Editable-file registry, independent migration histories, open schemas, and immutable runtime bundle. |
@@ -46,7 +49,13 @@ Gameplay reads an immutable `ClaimState` and a world/chunk `ClaimIndex`, maintai
 
 Each mutation validates against committed state. One global pending-operation slot reserves all mutations while a save/backup runs; simultaneous mutations receive a retry message. Immutable before/after snapshots go to a single worker. SQLite writes only changed records in one transaction. A successful commit is published on the server thread before player acknowledgement; failed saves keep existing protection and disable subsequent mutations until repair/restart.
 
-Trust and flag changes increment claim revisions. Deletion confirmations bind sender, original permission, target/tree snapshots, and a 30-second expiry. Disconnect clears player confirmations and bypass state. Confirmation rechecks its own permission, original permission, current ownership, and the target tree.
+Trust and flag changes increment claim revisions. Deletion confirmations bind sender, original permission, target/tree snapshots, command family, and a 30-second expiry. `/claim delete confirm` and `/claima delete confirm` require no token and use the original target even after movement. Disconnect clears player confirmations and bypass state. Confirmation rechecks its own permission, original permission, current ownership, and the target tree.
+
+`/claima reset all` uses the same pending-confirmation store with a distinct action and a snapshot of all claims. `/claima reset all confirm` checks its own and the original permission, sender, expiry, and unchanged claim snapshot. `ClaimService.resetAll` preserves allowance accounts while removing all claims; SQLite cascading deletes remove local trust/flags. `SaltyClaims.resetClaims` uses the ordinary serialized transaction path and clears selections/previews only after successful persistence and state/index publication. Reset and individual deletion confirmations cannot confirm each other.
+
+`SelectionManager.Port` isolates the tool adapter from plugin lifecycle details. The second right-click invokes `ClaimCommands.commitSelection`, sharing create/resize permission checks, domain validation, and transactional persistence with commands. Validation failures retain the first/opposite corner for retry. Manual position commands only prepare a selection.
+
+Selection bounds always make roots full height; child Y bounds are absent for equal corner Y, otherwise inclusive min/max Y. Particle previews are separate from selection sessions, so successful submission retains the final border. Each player has at most one preview. The first corner outlines its block, the second replaces that with the inferred bounds. One shared 10-tick task repeats previews until their configured wall-clock expiry; rendering remains bounded and distance-limited. Cancel, quit, world changes, disable, and successful reload clear previews. `particle-duration-seconds` accepts integers 0–300, with 0 disabling particles and 10 as the default.
 
 Protection checks perform no database I/O. Claims are bounded to 65,536 indexed chunks each; ordinary area/count limits are configurable. Index rebuilding and global validation occur on mutation/startup, not per protection event. Very large datasets still require server profiling.
 
@@ -54,7 +63,11 @@ Protection checks perform no database I/O. Claims are bounded to 65,536 indexed 
 
 All player/console chat responses flow through `Messages`, including help/list output and asynchronous replies. `messages.yml` supplies templates and one global `prefix`; the service applies it once to each line. Validation uses `MessageException` with stable keys and placeholders. `Notice` carries immutable success data across the storage worker. Configuration reload validates both candidate files before publishing either. See [Messages](messages.md).
 
-Startup/reload now share `ConfigurationPipeline`. Both editable YAML resources have independent version 1 metadata; unversioned files start at 0. The pipeline saves only changed files using sensitive exact backups, detects concurrent edits, and publishes one immutable `RuntimeConfiguration` only after file saving and runtime application. See [Configuration versions and recovery](configuration-versioning.md) for validation, history, and multi-file recovery limits.
+Player names and claim locations form the public command/message interface. Stable UUIDs remain internal database keys. `HumanNames` renders identifiers in final outgoing lines, including custom legacy templates and diagnostic maps; missing names use configurable friendly labels. Deleted claims capture their display description before removal.
+
+Tool clicks check occupied land before altering selection positions. A rejected click replaces the particle preview with that claim's border and reports its owner's name. Legitimate owned-corner resize operations and child selection in the selected parent remain allowed; domain overlap validation still checks the entire resulting area.
+
+Startup/reload share `ConfigurationPipeline`. Editable resources have independent versions: `config.yml` is version 2 and `messages.yml` is version 5; unversioned files start at 0. The pipeline saves only changed files using sensitive exact backups, detects concurrent edits, and publishes one immutable `RuntimeConfiguration` only after file saving and runtime application. See [Configuration versions and recovery](configuration-versioning.md) for validation, history, and multi-file recovery limits.
 
 ## Plugin metadata
 

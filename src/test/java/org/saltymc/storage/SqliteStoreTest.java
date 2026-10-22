@@ -41,6 +41,21 @@ class SqliteStoreTest {
         try(SqliteStore first=new SqliteStore(db)) { assertThrows(Exception.class,()->new SqliteStore(db)); }
         assertDoesNotThrow(()->{try(SqliteStore ignored=new SqliteStore(db)) { }});
     }
+    @Test void resetAllPersistsAcrossRestartAndRemovesTrustAndFlagsButKeepsAccounts() throws Exception {
+        Path database=directory.resolve("claims.db"); Claim root=root(0,9),child=child(root,1,5),other=root(20,29);
+        root=root.change(root.bounds(),true,Map.of(Subject.PUBLIC,Trust.ACCESS),Map.of(Flag.PVP,"allow"));
+        ClaimState before=new ClaimState(state(root,child,other).claims(),Map.of(OWNER,new ClaimState.Account(42,100)));
+        ClaimState after=ClaimService.resetAll(before);
+        try(SqliteStore store=new SqliteStore(database)) {
+            store.save(ClaimState.empty(),before); store.save(before,after); assertEquals(after,store.load());
+        }
+        try(SqliteStore reopened=new SqliteStore(database)) { assertEquals(after,reopened.load()); }
+        try(Connection connection=DriverManager.getConnection("jdbc:sqlite:"+database); Statement statement=connection.createStatement()) {
+            for(String table:List.of("claims","claim_trust","claim_flags")) try(ResultSet rows=statement.executeQuery("SELECT count(*) FROM "+table)) {
+                assertTrue(rows.next()); assertEquals(0,rows.getInt(1),table);
+            }
+        }
+    }
     @Test void unknownSchemaFailsWithoutReinitializing() throws Exception {
         Path db=directory.resolve("claims.db");
         try(SqliteStore ignored=new SqliteStore(db)) { }

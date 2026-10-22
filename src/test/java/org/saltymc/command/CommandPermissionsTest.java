@@ -45,4 +45,32 @@ class CommandPermissionsTest {
         commands.onCommand(sender,command("claim"),"claim",new String[]{"child","restrict","on"});
         assertEquals(List.of("[SaltyClaims] Missing permission: saltyclaims.command.claim.child.restrict"),messages);
     }
+    @Test void deleteConfirmationHasItsOwnPermissionAndOldTopLevelRouteIsGone() {
+        List<String> messages=new ArrayList<>(); ClaimCommands commands=new ClaimCommands(null);
+        commands.onCommand(sender(Set.of("saltyclaims.command.claim.delete"),messages),command("claim"),"claim",new String[]{"delete","confirm"});
+        assertEquals(List.of("[SaltyClaims] Missing permission: saltyclaims.command.claim.delete.confirm"),messages);
+        messages.clear(); commands.onCommand(sender(Set.of(),messages),command("claim"),"claim",new String[]{"confirm","old-token"});
+        assertEquals(List.of("[SaltyClaims] Unknown subcommand. Use /claim help."),messages);
+    }
+    @Test void confirmationKeywordCanBeUsedAsOwnerViaExplicitNameOption() {
+        List<String> messages=new ArrayList<>();
+        new ClaimCommands(null).onCommand(sender(Set.of(),messages),command("claima"),"claima",new String[]{"delete","--owner","confirm"});
+        assertEquals(List.of("[SaltyClaims] Missing permission: saltyclaims.command.claima.delete"),messages);
+    }
+    @Test void helpUsesPlayerNamesAndNeverAdvertisesUuidOrTokens() {
+        List<String> messages=new ArrayList<>(); Set<String> permissions=new HashSet<>();
+        for(String path:ClaimCommands.ADMIN_PATHS) permissions.add(ClaimCommands.permission(true,path));
+        new ClaimCommands(null).onCommand(sender(permissions,messages),command("claima"),"claima",new String[]{"help"});
+        assertTrue(messages.contains("[SaltyClaims] /claima delete confirm"));
+        assertTrue(messages.stream().noneMatch(text->text.contains("<id>")||text.contains("<token>")||text.contains("UUID")));
+    }
+    @Test void resetConfirmationRequiresItsOwnPermissionAndHasSeparateCompletion() {
+        List<String> messages=new ArrayList<>(); ClaimCommands commands=new ClaimCommands(null);
+        CommandSender sender=sender(Set.of("saltyclaims.command.claima.reset.all"),messages);
+        commands.onCommand(sender,command("claima"),"claima",new String[]{"reset","all","confirm"});
+        assertEquals(List.of("[SaltyClaims] Missing permission: saltyclaims.command.claima.reset.all.confirm"),messages);
+        assertTrue(commands.onTabComplete(sender,command("claima"),"claima",new String[]{"reset","all",""}).isEmpty());
+        CommandSender confirmer=sender(Set.of("saltyclaims.command.claima.reset.all.confirm"),new ArrayList<>());
+        assertEquals(List.of("confirm"),commands.onTabComplete(confirmer,command("claima"),"claima",new String[]{"reset","all",""}));
+    }
 }

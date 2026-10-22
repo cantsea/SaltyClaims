@@ -36,7 +36,8 @@ class ConfigurationPipelineTest {
         assertEquals(10000,snapshot.settings().limits().starting());
         for(String name:List.of("config.yml","messages.yml")) {
             assertArrayEquals(ConfigFiles.resource(name),Files.readAllBytes(directory.resolve(name)));
-            assertTrue(Files.readString(directory.resolve(name)).stripTrailing().endsWith("config-version: 1"));
+            int version=name.equals("config.yml")?ConfigFiles.settingsFile().version():ConfigFiles.messagesFile().version();
+            assertTrue(Files.readString(directory.resolve(name)).stripTrailing().endsWith("config-version: "+version));
         }
         assertTrue(backups().isEmpty());
     }
@@ -48,7 +49,7 @@ class ConfigurationPipelineTest {
         assertEquals(1,backups().size()); assertArrayEquals(bytes(original),Files.readAllBytes(backups().getFirst()));
         String rewritten=Files.readString(directory.resolve("config.yml"));
         assertTrue(rewritten.contains("# Root claims cover full world height")); assertFalse(rewritten.contains("Private custom comment"));
-        assertTrue(rewritten.indexOf("claims:")<rewritten.indexOf("tools:")); assertTrue(rewritten.stripTrailing().endsWith("config-version: 1"));
+        assertTrue(rewritten.indexOf("claims:")<rewritten.indexOf("tools:")); assertTrue(rewritten.stripTrailing().endsWith("config-version: "+ConfigFiles.settingsFile().version()));
     }
     @Test void migrationsRunAllSkippedDestinationsInOrderBeforePruning() throws Exception {
         List<Integer> visited=new ArrayList<>();
@@ -166,7 +167,7 @@ class ConfigurationPipelineTest {
         assertFalse(Files.exists(directory.resolve("b.yml"))); assertTrue(backups().isEmpty());
     }
     @Test void invalidAndFutureVersionsAreNeverOverwritten() throws Exception {
-        for(String version:List.of("0","-1","1.5","'1'","true","null","2147483648","2")) {
+        for(String version:List.of("0","-1","1.5","'1'","true","null","2147483648",Integer.toString(ConfigFiles.messagesFile().version()+1))) {
             String original="prefix: PRIVATE_PREFIX\nconfig-version: "+version+"\n"; write("messages.yml",original);
             assertThrows(ConfigException.class,()->ConfigFiles.pipeline(directory,ignored->{}).update(candidate->{},candidate->{}));
             assertEquals(original,Files.readString(directory.resolve("messages.yml"))); assertFalse(Files.exists(directory.resolve("config.yml"))); assertTrue(backups().isEmpty());
@@ -181,9 +182,9 @@ class ConfigurationPipelineTest {
     }
     @Test void metadataIsMovedToBottomWhenNecessary() throws Exception {
         var pipeline=ConfigFiles.pipeline(directory,ignored->{}); pipeline.update(candidate->{},candidate->{});
-        Path config=directory.resolve("config.yml"); String text=Files.readString(config).replace("config-version: 1",""); Files.writeString(config,"config-version: 1\n"+text);
+        Path config=directory.resolve("config.yml"); String version="config-version: "+ConfigFiles.settingsFile().version(); String text=Files.readString(config).replace(version,""); Files.writeString(config,version+"\n"+text);
         pipeline.update(candidate->{},candidate->{});
-        assertTrue(Files.readString(config).stripTrailing().endsWith("config-version: 1")); assertEquals(1,backups().size());
+        assertTrue(Files.readString(config).stripTrailing().endsWith("config-version: "+ConfigFiles.settingsFile().version())); assertEquals(1,backups().size());
     }
     @Test void concurrentEditsAreDetectedEvenWhenUnchangedFileIsEdited() throws Exception {
         var pipeline=ConfigFiles.pipeline(directory,ignored->{}); var before=pipeline.update(candidate->{},candidate->{});
@@ -300,7 +301,7 @@ class ConfigurationPipelineTest {
         assertEquals("null\n",Files.readString(directory.resolve("config.yml"))); assertFalse(Files.exists(directory.resolve("messages.yml")));
         write("config.yml","# comment-only legacy file\n");
         ConfigFiles.pipeline(directory,ignored->{}).update(candidate->{},candidate->{});
-        assertTrue(Files.readString(directory.resolve("config.yml")).contains("config-version: 1"));
+        assertTrue(Files.readString(directory.resolve("config.yml")).contains("config-version: "+ConfigFiles.settingsFile().version()));
     }
     @Test void nonRegularEditableFileFailsBeforeCreatingOtherFiles() throws Exception {
         Files.createDirectory(directory.resolve("config.yml"));

@@ -6,13 +6,17 @@ import org.saltymc.config.*;
 import java.nio.file.*;
 import java.util.*;
 import java.util.regex.*;
+import java.util.function.UnaryOperator;
 
 /** Immutable messages snapshot. Templates are colored before inserting literal placeholder data. */
 public final class Messages {
     private static final Pattern PLACEHOLDER=Pattern.compile("\\{([a-zA-Z0-9_-]+)}");
     private static final Messages DEFAULTS=readDefaults();
     private final Map<String,String> templates;
-    private Messages(Map<String,String> templates) { this.templates=Map.copyOf(templates); }
+    private final UnaryOperator<String> display;
+    private Messages(Map<String,String> templates) { this(templates,UnaryOperator.identity()); }
+    private Messages(Map<String,String> templates,UnaryOperator<String> display) { this.templates=Map.copyOf(templates); this.display=display; }
+    public Messages withDisplay(UnaryOperator<String> display) { return new Messages(templates,display); }
     public static Messages defaults() { return DEFAULTS; }
     public static Messages load(Path path) throws Exception {
         return from(ConfigFiles.messagesFile().prepare(Files.readAllBytes(path)).document());
@@ -26,6 +30,10 @@ public final class Messages {
             String value=templates.get(entry.getKey());
             if(value==null) throw ConfigException.at("messages.yml",entry.getKey(),"is missing");
             Set<String> allowed=placeholders(entry.getValue());
+            // v1 custom templates may keep these deprecated placeholders; their values are now empty.
+            if(entry.getKey().equals("commands.confirm-delete")) allowed.addAll(Set.of("token","id","seconds"));
+            if(entry.getKey().equals("selection.preview")) allowed.add("command");
+            if(entry.getKey().equals("errors.overlap")) allowed.addAll(Set.of("id","other"));
             if(!allowed.containsAll(placeholders(value))) throw ConfigException.at("messages.yml",entry.getKey(),"references an unsupported placeholder; use placeholders from the bundled template");
         }
         return new Messages(templates);
@@ -70,7 +78,7 @@ public final class Messages {
     public List<String> lines(Notice notice) {
         String body=text(notice), prefix=color(templates.get("prefix"));
         if(body.isEmpty()) return List.of();
-        return Arrays.stream(body.split("\\R",-1)).map(line->prefix+line).toList();
+        return Arrays.stream(body.split("\\R",-1)).map(line->display.apply(prefix+line)).toList();
     }
     public void send(CommandSender sender,String key,Object... pairs) { send(sender,Notice.of(key,pairs)); }
     public void send(CommandSender sender,Notice notice) { lines(notice).forEach(sender::sendMessage); }

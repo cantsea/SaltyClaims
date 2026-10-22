@@ -16,12 +16,16 @@ On Linux/macOS, run `bash gradlew build`. Copy `build/libs/SaltyClaims-1.0-SNAPS
 
 ## Claim land
 
-1. Right-click two opposite block corners with a golden shovel, or select your current block using `/claim pos1` and `/claim pos2`.
-2. Review the temporary border preview and run `/claim create`.
+1. Right-click two opposite block corners with a golden shovel. The second click immediately attempts creation, checking allowance, overlap, and claim limits.
+2. If creation is rejected, read the denial and choose another second corner. For manual selection, use `/claim pos1`, `/claim pos2`, then `/claim create`.
 3. Inspect with a stick or `/claim info`; view allowance with `/claim list`.
-4. To resize, right-click an owned corner with the shovel, select its new position, then `/claim resize`. Alternatively select two new corners and resize with `--id <uuid>`.
+4. To resize, right-click an owned corner with the shovel, then its new position. The second click attempts the resize immediately. Manual selections can still be applied with `/claim resize`.
 
 Defaults: 10,000 starting claim blocks, 20 roots, 100 children per root, and a minimum X/Z width of three. Root area is charged once; children are free. Playtime accrual is not implemented. Configure limits and tool items in `plugins/SaltyClaims/config.yml`.
+
+Particles first outline the selected block, then expand to the selected rectangle or cuboid. `particle-duration-seconds: 10` controls how long the current border repeats after a selection or inspection; set it to `0` to disable particles (range 0–300). New previews replace the previous border, and `/claim cancel`, disconnecting, changing worlds, or a successful reload clears it.
+
+Right-clicking claimed land with the shovel shows its border and `This land is already claimed by <owner>.` without changing either selected position. Owned-corner resizing and child selection within the selected parent are allowed. Even when both corners are outside another claim, creation still checks the entire rectangle for overlaps.
 
 ## Trust, children, and flags
 
@@ -34,9 +38,8 @@ Defaults: 10,000 starting claim blocks, 20 roots, 100 children per root, and a m
 /claim trustlist
 /claim untrust Alex
 
-/claim mode child 3d --root
-# Select two block corners including Y, then:
-/claim child create
+/claim mode child --root
+# Right-click two corners: same Y creates a full-height child; different Y creates a 3D child.
 /claim child restrict on
 
 /claim flags
@@ -46,21 +49,29 @@ Defaults: 10,000 starting claim blocks, 20 roots, 100 children per root, and a m
 /claim explain container-use Alex
 ```
 
-Commands act on the child at your location, otherwise the root. Use `--root` or `--id <uuid>` explicitly for player management commands. Children cannot contain children. Restricting a child disables parent trust inheritance, while flags continue to inherit. Managers can delegate lower trust, but ownership, geometry, flag edits, and manager assignment remain owner-only.
+Commands act on the child at your location, otherwise the root. Use `--root`, `--owner <player>`, or `--at <world> <x> <y> <z>` for explicit targeting. An owner name selects their sole root remotely; multiple claims require a location. Commands and messages use player names and claim locations. Children cannot contain children. Restricting a child disables parent trust inheritance, while flags continue to inherit. Managers can delegate lower trust, but ownership, geometry, flag edits, and manager assignment remain owner-only.
+
+To delete, run `/claim delete`. The response is `Type /claim delete confirm to delete this claim.` (or `child claim`). Run that command within 30 seconds. Confirmation remains bound to the original claim/tree even if you move; deleting a parent also removes its children.
 
 ## Administration
 
 ```text
 /claima help
-/claima inspect <claim-uuid>
+/claima inspect Alex --at world 100 64 200
 /claima bypass on
-/claima trust <claim-uuid> Alex build
+/claima trust Alex Sam build --at world 100 64 200
+/claima delete Alex --at world 100 64 200
+/claima delete confirm
+/claima reset all
+/claima reset all confirm
 /claima balance add Alex 1000
 /claima backup
 /claima reload
 ```
 
 Each executable player/admin subcommand has its own permission; there is no shared root permission. Player nodes default to true and admin nodes to op. For example, `saltyclaims.command.claim.create` and `saltyclaims.command.claima.delete` are independent. Flag editing also checks `saltyclaims.flag.<key>`. Administrative bypass is off on each connection and does not override enforced server flags or grant administrative command permissions.
+
+`/claima reset all` requests deletion of every claim on this server. Confirm within 30 seconds using `/claima reset all confirm`. These require `saltyclaims.command.claima.reset.all` and `saltyclaims.command.claima.reset.all.confirm` respectively; confirmation also rechecks the request permission. Reset removes all parents, children, local trust, and local flags, clears selection previews after saving, and releases all used area. Earned/bonus balances, configuration, and backups remain. Any claim change invalidates the pending reset.
 
 Changes become active after a successful SQLite transaction. Only one mutation/backup may be pending at once; other mutation requests receive a retry message. Runtime save failure retains existing protection and disables writes until repair/restart. Startup load failure enters maintenance mode. Whole-plugin hot reload/unload is unsupported.
 

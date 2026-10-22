@@ -8,6 +8,8 @@ Implementation choices: 10,000 starting blocks, configurable root/child limits, 
 
 Confirmed requirements are single-server storage, lightweight protection, full-height rectangular root claims, native flags, GP-style trust, and later subdivisions/child claims that can be 3D. The hierarchy has exactly one subdivision level: a root can contain children, but a child cannot contain another child. Other choices below are proposed defaults, not additional confirmed requirements.
 
+Selection interaction now infers child height: equal Y corners produce full-height children; different Y corners produce bounded 3D children. Roots remain full height. A configurable timed particle border outlines position 1, expands to position 2, and repeats for `particle-duration-seconds` (default 10). Deletion prompts distinguish a claim from a child claim and require the corresponding `delete confirm` command.
+
 Deliver usable root claims first, then child claims as a separate milestone. Design persistence and authorization for both from the beginning.
 
 ## GriefPrevention reference
@@ -27,7 +29,7 @@ The upstream documentation describes ongoing v17+ changes. These are references 
 
 - A root claim owns an inclusive X/Z rectangle across the world's entire buildable height.
 - Proposed default tool: golden shovel for selection and resizing, stick for inspection; both configurable.
-- Select opposite corners, preview borders, dimensions, and cost, then commit a validated claim. Clicking an existing corner enters resize mode.
+- Select opposite corners with the tool; the second click immediately attempts a validated claim and shows borders/cost. Rejection retains the first corner for retry. Clicking an existing owned corner enters resize mode, and its next click attempts the resize.
 - Inspection reports claim ID, owner, root/child context, and effective access, with temporary client-side boundary visuals. It never changes real blocks.
 - Commands provide alternatives for selecting corners, creating, resizing, inspecting, listing, and deleting claims.
 - Sessions are per player; cancel or expire on disconnect, world change, explicit cancellation, or timeout. Pending sessions are not persistent claims.
@@ -81,7 +83,7 @@ Visitor and Owner are derived states, not assignable trust levels. Store explici
 
 Manage is proposed as GP-inspired permission delegation, not co-ownership. Managers cannot grant Manage, remove peer managers, change ownership/bounds/flags, or manage outside their authorized scope. The owner alone delegates management, apart from explicit staff authority.
 
-Support named players by UUID and an explicit PUBLIC subject. Never represent public access as a fabricated player UUID. Public can receive Access, Container, or Build, never Manage. Resolve offline names without blocking gameplay threads, and reject unresolved targets clearly.
+Store player identity internally by UUID and use an explicit PUBLIC subject. Commands and messages use player names. Never represent public access as a fabricated player UUID. Public can receive Access, Container, or Build, never Manage. Resolve cached offline names without blocking gameplay threads, and reject unresolved targets clearly.
 
 Permission nodes gate use of plugin features. They do not confer trust in arbitrary claims. Exact classification of animals, crops, decorative entities, vehicles, and utility blocks belongs in the protection matrix, so the broad role names do not hide exceptions.
 
@@ -169,7 +171,7 @@ On unrecoverable startup load/migration failure, propose fail-closed maintenance
 
 Confirmed command roots are `/claim` for players and `/claima` for administration, with all actions exposed as subcommands. No standalone GP-style aliases are planned. Every executable subcommand, including nested leaves, requires its own permission: `saltyclaims.command.claim.<path>` or `saltyclaims.command.claima.<path>`. Do not combine multiple actions under a shared edit/use gate. Help/completion filter permissions; execution and selection tools enforce the relevant capability independently. See [Commands and permissions](commands-permissions.md) for planned syntax and permission defaults.
 
-Contextual commands resolve the current child, otherwise root; explicit root scope or claim UUID is available. Show the selected scope before destructive operations. Console uses explicit UUIDs. Confirmation tokens bind actor, target, revision, action, and expiry so a stale confirmation cannot delete a changed claim tree.
+Contextual commands resolve the current child, otherwise root; explicit owner, root scope, and location selectors are available. Names with multiple claims require a location. Console uses owner names and coordinates, or `here --at` when an owner name is unavailable. Show the selected scope before destructive operations. `/claim delete confirm` and `/claima delete confirm` bind actor, target tree, original permission, command family, and expiry so a stale confirmation cannot delete a changed claim tree. No public confirmation token is needed.
 
 Staff receive separate permissions for every administrative subcommand, including inspect, bypass, delete, resize, trust, flag, individual balance operations, configuration reload, backups, and confirmation. Confirming rechecks both its own permission and the original action permission. Bypass is an explicit session toggle, off by default and reset on reconnect. Log staff mutations and bypass sessions; log mutating bypass actions with actor and claim, with bounded log rotation.
 

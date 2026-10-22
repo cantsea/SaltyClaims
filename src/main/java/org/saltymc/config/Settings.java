@@ -9,7 +9,7 @@ import java.util.*;
 
 /** Fully validated immutable settings; supplied values never use coercing/fallback getters. */
 public record Settings(ClaimService.Limits limits,Material selectionTool,Material inspectionTool,
-                       int sessionSeconds,Set<String> disabledWorlds,Map<Flag,String> defaults,
+                       int sessionSeconds,int previewSeconds,Set<String> disabledWorlds,Map<Flag,String> defaults,
                        Map<Flag,String> enforced,Map<String,Map<Flag,String>> worlds) {
     public Settings {
         Objects.requireNonNull(limits); Objects.requireNonNull(selectionTool); Objects.requireNonNull(inspectionTool);
@@ -30,6 +30,7 @@ public record Settings(ClaimService.Limits limits,Material selectionTool,Materia
         Material select=material(tools,"selection"),inspect=material(tools,"inspection");
         if(select==inspect) throw ConfigException.at("config.yml","tools","requires distinct selection and inspection items");
         int timeout=(int)integer(data,"selection-timeout-seconds","selection-timeout-seconds",10,3600);
+        int preview=(int)integer(data,"particle-duration-seconds","particle-duration-seconds",0,300);
         Object disabled=data.get("disabled-worlds");
         if(!(disabled instanceof List<?> list)) throw ConfigException.at("config.yml","disabled-worlds","must be a list of nonempty strings");
         Set<String> disabledWorlds=new LinkedHashSet<>();
@@ -43,7 +44,7 @@ public record Settings(ClaimService.Limits limits,Material selectionTool,Materia
             if(entry.getKey().isBlank()) throw ConfigException.at("config.yml","worlds","requires nonempty world names");
             worlds.put(entry.getKey(),flags(YamlData.map(entry.getValue(),"config.yml","worlds."+entry.getKey()),"worlds."+entry.getKey()));
         }
-        return new Settings(new ClaimService.Limits(starting,width,roots,children,area),select,inspect,timeout,disabledWorlds,
+        return new Settings(new ClaimService.Limits(starting,width,roots,children,area),select,inspect,timeout,preview,disabledWorlds,
                 flags(YamlData.map(flagSection.get("defaults"),"config.yml","flags.defaults"),"flags.defaults"),
                 flags(YamlData.map(flagSection.get("enforced"),"config.yml","flags.enforced"),"flags.enforced"),worlds);
     }

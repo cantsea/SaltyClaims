@@ -32,4 +32,11 @@ class SettingsTest {
         assertThrows(IllegalArgumentException.class,()->load("tools:\n  inspection: GOLDEN_SHOVEL\n"));
         assertEquals(1234,original.limits().starting());
     }
+    @Test void particleDurationIsStrictAndPreservedDuringUpgrade() throws Exception {
+        assertEquals(10,load("config-version: 1\n").previewSeconds());
+        assertEquals(45,load("particle-duration-seconds: 45\nconfig-version: 1\n").previewSeconds());
+        assertEquals(0,load("particle-duration-seconds: 0\n").previewSeconds());
+        for(String value:new String[]{"-1","301","1.5","'10'","null"})
+            assertThrows(IllegalArgumentException.class,()->load("particle-duration-seconds: "+value+"\n"),value);
+    }
 }

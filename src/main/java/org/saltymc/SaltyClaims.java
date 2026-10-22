@@ -3,6 +3,7 @@ package org.saltymc;
 import org.saltymc.message.MessageException;
 import org.saltymc.message.Messages;
 import org.saltymc.message.Notice;
+import org.saltymc.message.HumanNames;
 
 import org.bukkit.*;
 import org.bukkit.command.CommandSender;
@@ -23,7 +24,7 @@ import java.util.concurrent.*;
 import java.util.function.Function;
 import java.util.logging.Level;
 
-public final class SaltyClaims extends JavaPlugin implements Listener {
+public final class SaltyClaims extends JavaPlugin implements Listener,SelectionManager.Port {
     private ClaimState state = ClaimState.empty();
     private ClaimIndex index = new ClaimIndex(state);
     private ConfigurationPipeline<ConfigFiles.RuntimeConfiguration> configuration;
@@ -34,11 +35,13 @@ public final class SaltyClaims extends JavaPlugin implements Listener {
     private SelectionManager selections;
     private final Set<UUID> bypass = new HashSet<>();
     private final Map<UUID, Long> lastDenial = new HashMap<>();
+    private final HumanNames names=new HumanNames(this::state,id->Bukkit.getOfflinePlayer(id).getName(),
+            id->{ World world=Bukkit.getWorld(id); return world==null?null:world.getName(); },notice->messages().text(notice));
 
     @Override
     public void onEnable() {
         try {
-            configuration=ConfigFiles.pipeline(getDataFolder().toPath(),message->getLogger().info(message));
+            configuration=ConfigFiles.pipeline(getDataFolder().toPath(),message->getLogger().info(message),names::replaceIdentifiers);
             applyConfiguration();
             // No database or worker starts until every editable file is validated, saved and applied.
             worker = Executors.newSingleThreadExecutor(r -> { Thread t = new Thread(r, "SaltyClaims-storage"); t.setDaemon(true); return t; });
@@ -46,8 +49,8 @@ public final class SaltyClaims extends JavaPlugin implements Listener {
             state = store.load(); index = new ClaimIndex(state); ready = true;
         } catch (ConfigException e) { getLogger().severe("Configuration startup rejected; maintenance active: "+e.getMessage()); }
         catch (Exception e) { getLogger().log(Level.SEVERE, "Storage startup failed. Maintenance mode is active; fix the error and restart.", e); }
-        selections = new SelectionManager(this);
         ClaimCommands commands = new ClaimCommands(this);
+        selections = new SelectionManager(this,commands::commitSelection);
         commands.registerPermissions();
         for (String name : List.of("claim", "claima")) {
             Objects.requireNonNull(getCommand(name)).setExecutor(commands);
@@ -58,12 +61,14 @@ public final class SaltyClaims extends JavaPlugin implements Listener {
         Bukkit.getPluginManager().registerEvents(selections, this);
         Bukkit.getPluginManager().registerEvents(new ProtectionListener(this), this);
         Bukkit.getScheduler().runTaskTimer(this, () -> { selections.expire(); commands.expire(); }, 200, 200);
+        Bukkit.getScheduler().runTaskTimer(this,selections::tickPreviews,10,10);
         getLogger().info(ready ? "Loaded " + state.claims().size() + " claims." : "MAINTENANCE: claim data unavailable.");
     }
 
     @Override
     public void onDisable() {
         closing = true; ready = false;
+        if(selections!=null) selections.clear();
         if (worker == null) return;
         worker.shutdown();
         try {
@@ -78,7 +83,11 @@ public final class SaltyClaims extends JavaPlugin implements Listener {
     public ClaimState state() { return state; }
     public Settings settings() { return configuration.current().settings(); }
     public Messages messages() { return configuration==null||configuration.current()==null?Messages.defaults():configuration.current().messages(); }
+    public String playerName(UUID id) { return names.player(id); }
+    public String worldName(UUID id) { return names.world(id); }
+    public String claimName(Claim claim) { return names.claim(claim); }
     public SelectionManager selections() { return selections; }
+    public void showBounds(Player player,Bounds bounds,World world) { selections.preview(player,bounds,world); }
     public boolean ready() { return ready && !closing; }
     public Claim at(Location l) { return index.at(l.getWorld().getUID(), l.getBlockX(), l.getBlockY(), l.getBlockZ()); }
     public boolean bypass(Player p) { return bypass.contains(p.getUniqueId()) && p.hasPermission("saltyclaims.command.claima.bypass"); }
@@ -108,6 +117,15 @@ public final class SaltyClaims extends JavaPlugin implements Listener {
         if (bypass(p) && at(l) != null) getLogger().info("BYPASS " + p.getUniqueId() + " " + action + " claim=" + at(l).id());
     }
     public void mutate(CommandSender sender, Function<ClaimState, ClaimState> operation, Notice success) {
+        mutate(sender,operation,success,()->{});
+    }
+    public void resetClaims(CommandSender sender,Map<UUID,Claim> expected) {
+        mutate(sender,current->{
+            if(!current.claims().equals(expected)) throw new MessageException("errors.reset-changed");
+            return ClaimService.resetAll(current);
+        },Notice.of("success.reset-all","count",expected.size()),selections::clear);
+    }
+    private void mutate(CommandSender sender, Function<ClaimState, ClaimState> operation, Notice success,Runnable committed) {
         if (!ready() || writeFailed) throw new MessageException("errors.storage-unavailable");
         if (busy) throw new MessageException("errors.storage-busy");
         ClaimState before = state, after = operation.apply(before);
@@ -121,6 +139,7 @@ public final class SaltyClaims extends JavaPlugin implements Listener {
                 busy = false;
                 if (result == null) {
                     state = after; index = nextIndex;
+                    committed.run();
                     messages().send(sender,success);
                     getLogger().info(sender.getName() + ": " + success.key()+" "+success.values());
                 } else {

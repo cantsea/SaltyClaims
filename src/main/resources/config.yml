@@ -10,6 +10,8 @@ tools:
   selection: GOLDEN_SHOVEL
   inspection: STICK
 selection-timeout-seconds: 120
+# How long selection and inspection borders repeat (0 disables particles; maximum 300).
+particle-duration-seconds: 10
 disabled-worlds: []
 # Missing flags use built-in claim defaults; wilderness is permissive.
 # Values here also apply to wilderness. Owner overrides cannot defeat enforced values.
@@ -20,4 +22,4 @@ flags:
 worlds: {}
 
 # Independent configuration schema version. Managed automatically; do not edit.
-config-version: 1
+config-version: 2

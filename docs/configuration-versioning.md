@@ -2,7 +2,7 @@
 
 ## Independent versions
 
-The editable file registry is `config.ConfigFiles`. It currently manages `config.yml` and `messages.yml`, each with its own positive integer `config-version` as the last setting. Both start at version 1. These versions are independent of each other, the plugin release (`1.0-SNAPSHOT`), and SQLite's schema version. `plugin.yml` is packaged plugin metadata, not a runtime-editable settings file.
+The editable file registry is `config.ConfigFiles`. It currently manages `config.yml` and `messages.yml`, each with its own positive integer `config-version` as the last setting. Current versions are 2 for `config.yml` and 5 for `messages.yml`. These versions are independent of each other, the plugin release (`1.0-SNAPSHOT`), and SQLite's schema version. `plugin.yml` is packaged plugin metadata, not a runtime-editable settings file.
 
 Missing files are created from the current bundled resource after the whole bundle passes validation. Existing blank/comment-only files or mappings without `config-version` are legacy version 0. Explicit zero, negative, fractional, quoted, boolean, null, out-of-range, or future versions are rejected without overwriting supplied files. Do not manually change version numbers to bypass migrations or downgrade.
 
@@ -11,9 +11,14 @@ Missing files are created from the current bundled resource after the whole bund
 | File | Step / destination | Preserved | Added | Renamed / intentionally converted |
 | --- | --- | --- | --- | --- |
 | `config.yml` | 0 -> 1 | Supplied valid settings, lists, world entries, flag maps | Independent metadata and missing current settings | None |
+| `config.yml` | 1 -> 2 | All supplied settings, including a valid existing particle duration | `particle-duration-seconds`, default 10, integer 0–300; 0 disables particles | None; no removed paths |
 | `messages.yml` | 0 -> 1 | Supplied valid prefix and message templates | Independent metadata and missing current messages | None |
+| `messages.yml` | 1 -> 2 | Custom prefix and customized template wording except exact obsolete command spellings | Player/world/claim labels and named-target errors | Replace unchanged stock tool, targeting, overlap, and deletion instructions; convert old confirmation/ID command spellings in custom strings; remove obsolete `errors.uuid` during reconciliation |
+| `messages.yml` | 2 -> 3 | Custom prefix/templates and legacy deletion placeholders | `labels.claim`, `labels.child-claim` | Replace only exact former stock `commands.confirm-delete`, `commands.mode-child`, `errors.select-root`, and `errors.child-mode` text with simple claim/child deletion and automatic-height instructions; no renamed/removed paths |
+| `messages.yml` | 3 -> 4 | All supplied templates and prefixes | `selection.already-claimed` with the owner-name placeholder | None; no renamed, removed, or intentionally replaced paths |
+| `messages.yml` | 4 -> 5 | All supplied templates and prefixes | Server-wide reset confirmation, success, and changed-snapshot messages | None; no renamed, removed, or intentionally replaced paths |
 
-After migration, reconciliation removes obsolete paths in fixed-schema sections. It never resets a configured value merely because a bundled default changed. These initial migrations introduce no gameplay conversions or speculative legacy key renames.
+After migration, reconciliation removes obsolete paths in fixed-schema sections. It never resets a configured value merely because a bundled default changed. Step 2 explicitly replaces exact version-1 stock values for `commands.help-admin`, `commands.help-player`, `commands.tool`, `commands.confirm-delete`, `selection.preview`, `selection.resize`, `errors.unknown-player`, `errors.admin-target`, `errors.child-required`, `errors.no-claim`, and `errors.overlap`. Other wording remains configured. Across custom strings, exact `/{command} confirm {token}`, `/claim confirm {token}`, and `/claima confirm {token}` spellings become their corresponding `delete confirm` routes; `--id <uuid>` becomes `--owner <player>`. No configuration paths are renamed. Legacy deletion `{token}` and preview `{command}` placeholders remain valid with empty values. Config/database versions are unaffected.
 
 Each `MigrationStep` number is its **destination** version. The history must contain every ordered step from 1 through the bundled version. An installation at version 1 upgrading to version 4 runs steps 2, 3, and 4. A missing file already uses current defaults and does not run historical conversions against them.
 

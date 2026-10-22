@@ -8,7 +8,9 @@ Claims, child claims, trust, flags, and session-only administrative bypass are i
 
 ## Commands
 
-The tables below describe the implemented command paths. All geometry changes require a loaded world, valid bounds, and relevant authority. Player management commands accept `--id <uuid>` or `--root`; admin claim commands take the UUID positionally, immediately after their subcommand. Unknown offline names must already be in the server cache, or be supplied as UUIDs; name resolution never blocks on a remote lookup.
+The tables below describe the implemented command paths. All geometry changes require a loaded world, valid bounds, and relevant authority. Player management commands accept `--owner <player>`, `--root`, and `--at <world> <x> <y> <z>`. Admin claim commands take the owner's player name immediately after their subcommand. Player arguments accept online or cached offline names; unresolved names are rejected without a remote lookup. UUID arguments are not accepted.
+
+An owner name selects their sole root remotely. If the owner has multiple roots, stand in the intended claim or supply `--at`; the command rejects ambiguous targets. Location targeting chooses the containing child unless `--root` is supplied. Staff can use `here` instead of an owner to target their current location (or `--at` from console), including claims whose owner name is unavailable. Use `--owner <player>` to disambiguate a player literally named `here` or `confirm`.
 
 Command structure: `/claim <subcommand>` for players and `/claima <subcommand>` for administration. Every executable subcommand, including nested subcommands, has its own permission node.
 
@@ -16,7 +18,7 @@ Player command nodes use `saltyclaims.command.claim.<path>`; administrative comm
 
 ### Player commands
 
-Player commands require a player sender. Context resolves to the child containing the player, otherwise its root. Management commands support an explicit claim UUID or root scope; targeting a claim never bypasses authorization. Read-only list/inspection output must avoid exposing private trust details to unrelated players.
+Player commands require a player sender. Context resolves to the child containing the player, otherwise its root. Targeting by owner, location, or root scope never bypasses authorization. Read-only list/inspection output avoids exposing private trust details to unrelated players.
 
 | Command | Purpose | Permission | Claim authority |
 | --- | --- | --- | --- |
@@ -27,10 +29,10 @@ Player commands require a player sender. Context resolves to the child containin
 | `/claim create` | Create a root from the current selection. | `saltyclaims.command.claim.create` | Available allowance and valid bounds |
 | `/claim resize` | Apply the selection to the current claim. | `saltyclaims.command.claim.resize` | Owner |
 | `/claim cancel` | Clear a selection or pending confirmation. | `saltyclaims.command.claim.cancel` | Sender's own session |
-| `/claim info [id]` | Inspect identity, bounds, and effective policy. | `saltyclaims.command.claim.info` | Public summary; private details only for authorized users |
+| `/claim info [owner]` | Inspect owner, bounds, and effective policy. | `saltyclaims.command.claim.info` | Public summary; private details only for authorized users |
 | `/claim list` | List owned root claims and allowance. | `saltyclaims.command.claim.list` | Own claims |
 | `/claim delete` | Delete the current claim, confirming destructive tree removal. | `saltyclaims.command.claim.delete` | Owner |
-| `/claim confirm <token>` | Confirm the specific pending destructive action. | `saltyclaims.command.claim.confirm` plus original action's permission | Revalidate original authority and target revision |
+| `/claim delete confirm` | Confirm the pending deletion within 30 seconds. | `saltyclaims.command.claim.delete.confirm` plus `saltyclaims.command.claim.delete` | Revalidate original authority and target tree |
 | `/claim trust <player\|public> [level]` | Set a local grant; omitted level means Build. | `saltyclaims.command.claim.trust` | Owner or scoped Manage; delegation limits apply |
 | `/claim untrust <player\|public\|all>` | Remove local grants; explain remaining inherited/public access. | `saltyclaims.command.claim.untrust` | Owner or scoped Manage; cannot remove peer Manage grants |
 | `/claim trustlist` | Show local and inherited grants and sources. | `saltyclaims.command.claim.trustlist` | Owner or scoped Manage |
@@ -38,7 +40,7 @@ Player commands require a player sender. Context resolves to the child containin
 | `/claim flag <key> <value\|reset>` | Set or remove a local flag override. | `saltyclaims.command.claim.flag` plus `saltyclaims.flag.<key>` | Owner; server locks still apply |
 | `/claim explain <action> [player]` | Explain a policy decision at this location. | `saltyclaims.command.claim.explain` | Owner or scoped Manage; staff may inspect others |
 | `/claim mode basic` | Switch selection to root claims. | `saltyclaims.command.claim.mode.basic` | Checked when committing |
-| `/claim mode child <full\|3d>` | Switch to child selection. | `saltyclaims.command.claim.mode.child` | Owner of selected root; use `--root` when inside an existing child |
+| `/claim mode child` | Switch to automatic child selection: equal corner Y means full height; different Y means 3D. | `saltyclaims.command.claim.mode.child` | Owner of selected root; use `--root` when inside an existing child |
 | `/claim child create` | Create a child inside the selected root. | `saltyclaims.command.claim.child.create` | Owner |
 | `/claim child restrict <on\|off>` | Disable/enable inherited root trust. | `saltyclaims.command.claim.child.restrict` | Owner |
 
@@ -46,33 +48,47 @@ Trust levels are `access`, `container`, `build`, and `manage`. Public cannot rec
 
 Children use the normal info, resize, delete, trust, and flag commands once selected, each with its own command permission and the same claim authority checks. Creating a child requires that the selected parent is a root, never another child.
 
-GP-style actions are exposed through `/claim` subcommands only. For example, `/claim trust Alex access` grants Access and `/claim trust Alex manage` grants Manage, with the latter remaining owner-only. Selection tools must enforce the corresponding create/resize/child-create permissions too, so a tool cannot bypass a denied command capability.
+Parent selections always produce full-height rectangles regardless of corner Y. Child selections and tool resizes infer height from the two corners. Legacy `/claim mode child full` and `/claim mode child 3d` remain accepted, but both now use this automatic height rule. Manual position selection uses the same rule when committed; an admin resize with explicit coordinates uses its supplied/existing Y bounds.
+
+Right-clicking claimed land with the selection tool shows its borders and owner name without setting or replacing either position. Existing owned corners can still start a resize, and child selection can use unoccupied parts of its selected parent. An existing child interior cannot start another child selection. Final mutation validation continues checking overlaps across the whole area, including claims between two otherwise valid corners.
+
+GP-style actions are exposed through `/claim` subcommands only. For example, `/claim trust Alex access` grants Access and `/claim trust Alex manage` grants Manage, with the latter remaining owner-only. Right-clicking the second tool corner immediately attempts creation or resizing through the same validation and save path as commands. Insufficient allowance, overlap, invalid geometry, and missing permissions reject the operation; the first corner remains selected for a retry. Selection tools enforce the corresponding create/resize/child-create permission. Manual `/claim pos1` and `/claim pos2` selections still require the matching create/resize command.
 
 ### Staff and console commands
 
 | Command | Purpose | Permission | Senders |
 | --- | --- | --- | --- |
 | `/claima help` | Show available administrative commands. | `saltyclaims.command.claima.help` | Player or console |
-| `/claima inspect <id>` | Inspect full claim/trust/flag state. | `saltyclaims.command.claima.inspect` | Player or console |
+| `/claima inspect <owner>` | Inspect full claim/trust/flag state. | `saltyclaims.command.claima.inspect` | Player or console |
 | `/claima bypass <on\|off>` | Toggle a session-only protection bypass. | `saltyclaims.command.claima.bypass` | Player |
-| `/claima delete <id>` | Confirm deletion of any claim/tree. | `saltyclaims.command.claima.delete` | Player or console |
-| `/claima resize <id> ...` | Resize using player selection or explicit bounds from console. | `saltyclaims.command.claima.resize` | Player or console |
-| `/claima trust <id> ...` | Manage trust in an explicit claim. | `saltyclaims.command.claima.trust` | Player or console |
-| `/claima untrust <id> <player\|public\|all>` | Remove local trust grants. | `saltyclaims.command.claima.untrust` | Player or console |
-| `/claima trustlist <id>` | Inspect local/inherited trust grants. | `saltyclaims.command.claima.trustlist` | Player or console |
-| `/claima flag <id> ...` | Edit a claim override; does not defeat server locks. | `saltyclaims.command.claima.flag` | Player or console |
-| `/claima flags <id>` | List effective flag values and sources. | `saltyclaims.command.claima.flags` | Player or console |
+| `/claima delete <owner>` | Confirm deletion of any claim/tree. | `saltyclaims.command.claima.delete` | Player or console |
+| `/claima resize <owner> ...` | Resize using player selection or explicit bounds from console. | `saltyclaims.command.claima.resize` | Player or console |
+| `/claima trust <owner> ...` | Manage trust in an explicit claim. | `saltyclaims.command.claima.trust` | Player or console |
+| `/claima untrust <owner> <player\|public\|all>` | Remove local trust grants. | `saltyclaims.command.claima.untrust` | Player or console |
+| `/claima trustlist <owner>` | Inspect local/inherited trust grants. | `saltyclaims.command.claima.trustlist` | Player or console |
+| `/claima flag <owner> ...` | Edit a claim override; does not defeat server locks. | `saltyclaims.command.claima.flag` | Player or console |
+| `/claima flags <owner>` | List effective flag values and sources. | `saltyclaims.command.claima.flags` | Player or console |
 | `/claima balance show <player>` | Inspect starting, earned, bonus, and used allowance. | `saltyclaims.command.claima.balance.show` | Player or console |
 | `/claima balance set <player> <amount>` | Set bonus allowance. | `saltyclaims.command.claima.balance.set` | Player or console |
 | `/claima balance add <player> <amount>` | Add bonus allowance. | `saltyclaims.command.claima.balance.add` | Player or console |
 | `/claima balance remove <player> <amount>` | Remove bonus allowance, subject to balance validation. | `saltyclaims.command.claima.balance.remove` | Player or console |
 | `/claima reload` | Validate and apply configuration and messages together. | `saltyclaims.command.claima.reload` | Player or console |
 | `/claima backup` | Request a consistent database backup. | `saltyclaims.command.claima.backup` | Player or console |
-| `/claima confirm <token>` | Confirm a bound administrative destructive action. | `saltyclaims.command.claima.confirm` plus original action's permission | Player or console |
+| `/claima delete confirm` | Confirm a bound administrative destructive action. | `saltyclaims.command.claima.delete.confirm` plus `saltyclaims.command.claima.delete` | Player or console |
+| `/claima reset all` | Request deletion of every parent/child claim on this server. | `saltyclaims.command.claima.reset.all` | Player or console |
+| `/claima reset all confirm` | Confirm that server-wide reset within 30 seconds. | `saltyclaims.command.claima.reset.all.confirm` plus `saltyclaims.command.claima.reset.all` | Player or console |
 
 Each administrative action requires its exact command permission; there is no shared edit permission. Gameplay bypass does not authorize deletion, trust changes, policy configuration, or allowance changes. Configuration locks cannot be overridden with a claim flag command. Staff use the explicit `/claima` action for administrative authority rather than gaining unrelated player command capabilities.
 
-Admin resize syntax is `/claima resize <id> <minX> <minZ> <maxX> <maxZ> [minY maxY]`. If coordinates are omitted, a player sender's selection is used. Root claims remain full height. Trust syntax is `/claima trust <id> <player|public> [level]`; flag syntax is `/claima flag <id> <key> <value|reset>`. Console requires explicit coordinates for resizing. Admin resizes can exceed the owner's allowance, but still obey size, containment, overlap, and world rules.
+Admin resize syntax is `/claima resize <owner> <minX> <minZ> <maxX> <maxZ> [minY maxY]`. If coordinates are omitted, a player sender's selection is used. Root claims remain full height. Trust syntax is `/claima trust <owner> <player|public> [level]`; flag syntax is `/claima flag <owner> <key> <value|reset>`. Console requires explicit coordinates for resizing. Admin resizes can exceed the owner's allowance, but still obey size, containment, overlap, and world rules.
+
+For example, `/claima trust Alex Sam build --at world 100 64 200` grants Sam Build in Alex's claim at those coordinates. `/claima inspect here --at world 100 64 200` inspects that location without requiring a known owner name.
+
+Deletion always uses a separate confirmation: request `/claim delete` or `/claima delete <owner>`, then use `/claim delete confirm` or `/claima delete confirm` within 30 seconds. The pending target is retained when the sender moves; a changed/deleted target or child tree invalidates confirmation. Only one deletion is pending per sender, and player/admin confirmations cannot substitute for each other. Confirmation takes no target arguments or token. Replace previously configured `saltyclaims.command.claim.confirm` and `saltyclaims.command.claima.confirm` grants with their respective `delete.confirm` nodes; the original delete permission is also checked again.
+
+The default player prompt is `Type /claim delete confirm to delete this claim.` or `Type /claim delete confirm to delete this child claim.` The administrative prompt uses `/claima`. Deleting a parent removes its children in the same database transaction.
+
+Server-wide resets have their own command and confirmation, without owner/location selectors or extra arguments. The request snapshots every claim; added, edited, or deleted claims invalidate it. Reset and single-claim delete requests replace each other for the same sender, but their confirmation commands cannot substitute for one another. Reset deletes all parent/child geometry, local trust, and local flags in one transaction; player earned/bonus balances and configured limits remain, and used area becomes zero. Only after saving succeeds are the empty protection state and cleared selections/previews published. Failure retains previous protection through the normal storage failure path. Existing configuration and backup files are untouched.
 
 ### Permission defaults
 

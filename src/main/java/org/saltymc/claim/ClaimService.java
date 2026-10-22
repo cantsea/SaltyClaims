@@ -13,6 +13,8 @@ public final class ClaimService {
         }
     }
     private ClaimService() { }
+    /** Remove all claim geometry, trust and flags; allowance accounts remain intact. */
+    public static ClaimState resetAll(ClaimState state) { return new ClaimState(Map.of(),state.accounts()); }
     public static ClaimState put(ClaimState state, Claim claim, Limits limits, boolean staff) {
         Bounds b = claim.bounds();
         if (b.chunks() > 65536 || b.area() > limits.maxArea()) throw new MessageException("errors.claim-large");
