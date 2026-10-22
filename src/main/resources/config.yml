@@ -7,14 +7,63 @@ claims:
   maximum-area: 1000000
 # Allowance accrual is not enabled; admins can adjust bonus blocks.
 tools:
-  selection: GOLDEN_SHOVEL
-  inspection: STICK
+  selection: STICK
+  child-selection: BONE
+  inspection: FEATHER
 selection-timeout-seconds: 120
 # How long selection and inspection borders repeat (0 disables particles; maximum 300).
 particle-duration-seconds: 10
 disabled-worlds: []
 # Missing flags use built-in claim defaults; wilderness is permissive.
 # Values here also apply to wilderness. Owner overrides cannot defeat enforced values.
+# Trust levels are cumulative under the built-in flag defaults:
+#   visitor: no grant; may enter/walk through claims, with no protected interactions.
+#   access: doors, trapdoors, gates, buttons/levers/pressure plates, beds, riding vehicles.
+#   container: Access plus inventories, workstations, harvesting/replanting crops,
+#              animal interaction, shearing and leashing.
+#   build: Container plus breaking/placing blocks, buckets, damaging animals,
+#          editing decorations/vehicles, and player ignition.
+#   manage: Build plus granting/revoking Access, Container and Build in its scope.
+#           Managers cannot grant/remove peer Manage grants or change geometry/flags.
+#   owner: all trust capabilities; can assign Manage, resize/delete and edit flags.
+# Public grants apply to everyone; Public cannot receive Manage.
+# Flags may raise/lower these access requirements. Actor deny also blocks owners.
+# Each command still needs its own permission. Server-enforced flags always win.
+# Normal trust commands edit the child at your location, otherwise its parent.
+# Children inherit parent grants unless restricted; the highest applicable grant wins.
+#
+# Complete flag reference (built-in claim default in brackets):
+# Actor flags accept public, access, container, build, manage, owner, or deny.
+#   block-break [build]: break ordinary blocks; mature crops use crop-harvest.
+#   block-place [build]: place blocks and perform block transformations/sign edits;
+#                        planting supported crops uses crop-replant.
+#   container-use [container]: open/use inventories, including double chests and lecterns.
+#   door-use [access]: open doors, trapdoors and gates.
+#   switch-use [access]: use buttons, levers, pressure plates and analog switches.
+#   bed-use [access]: interact with beds.
+#   utility-use [container]: use crafting tables, anvils, enchanting and other workstations.
+#   crop-harvest [container]: harvest mature supported crops/berries and trample farmland.
+#   crop-replant [container]: plant supported crops/seeds.
+#   bucket-use [build]: fill/empty buckets and player-caused cauldron changes.
+#   animal-interact [container]: interact with, shear, leash or unleash animals/entities.
+#   animal-damage [build]: player-attributed damage to protected non-player entities.
+#   decoration-edit [build]: place, manipulate or damage hanging decorations/armor stands.
+#   vehicle-edit [build]: place, edit or damage vehicles.
+#   vehicle-use [access]: ride/mount vehicles.
+#   ignite [build]: player ignition and player-triggered TNT priming.
+# Environment/boundary flags accept allow or deny:
+#   pvp [deny]: player-versus-player damage, including attributed indirect attacks.
+#   explosion-block-damage [deny]: explosion damage to blocks and non-player TNT priming.
+#   explosion-entity-damage [deny]: explosion damage to entities/decorations.
+#   fire-spread [deny]: non-player ignition, fire spreading and burning blocks.
+#   mob-block-grief [deny]: non-player block changes and cross-region non-fire spreading.
+#   fluid-crossing [deny]: fluid/sponge transfers across claim boundaries.
+#   piston-crossing [deny]: piston movement across claim boundaries.
+#   hopper-crossing [deny]: item transfers/pickups across claim boundaries.
+# Crossing includes parent/child and sibling boundaries; both sides must allow it.
+# Other applicable block/container flags can also block automated boundary transfers.
+# Child flags inherit from the parent even when child trust inheritance is disabled.
+# Precedence: enforced > child override > parent override > world > global > built-in.
 flags:
   defaults: {}
   enforced: {}
@@ -22,4 +71,4 @@ flags:
 worlds: {}
 
 # Independent configuration schema version. Managed automatically; do not edit.
-config-version: 2
+config-version: 5

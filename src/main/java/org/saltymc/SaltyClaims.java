@@ -125,7 +125,7 @@ public final class SaltyClaims extends JavaPlugin implements Listener,SelectionM
             return ClaimService.resetAll(current);
         },Notice.of("success.reset-all","count",expected.size()),selections::clear);
     }
-    private void mutate(CommandSender sender, Function<ClaimState, ClaimState> operation, Notice success,Runnable committed) {
+    public void mutate(CommandSender sender, Function<ClaimState, ClaimState> operation, Notice success,Runnable committed) {
         if (!ready() || writeFailed) throw new MessageException("errors.storage-unavailable");
         if (busy) throw new MessageException("errors.storage-busy");
         ClaimState before = state, after = operation.apply(before);

@@ -38,6 +38,7 @@ class SelectionManagerTest {
         int attempts;
         Location point(int x,int y,int z) { return new Location(world,x,y,z); }
         void click(int x,int y,int z) { manager.selectCorner(player,point(x,y,z)); }
+        void childClick(int x,int y,int z) { manager.selectCorner(player,point(x,y,z),true); }
         void commit(Player player) {
             attempts++;
             var selection=manager.session(player); Bounds bounds=manager.bounds(player); Claim claim;
@@ -49,10 +50,12 @@ class SelectionManagerTest {
                 boolean root=selection.mode.equals("basic");
                 claim=new Claim(UUID.randomUUID(),selection.first.getWorld().getUID(),root?OWNER:null,root?null:selection.parent,bounds,true,1,0,Map.of(),Map.of());
             }
-            state=ClaimService.put(state,claim,settings().limits(),false); manager.finish(player);
+            state=ClaimService.put(state,claim,settings().limits(),false);
+            if(selection.resize!=null) showBounds(player,claim.bounds(),world);
+            manager.finish(player);
         }
         public boolean ready() { return true; }
-        public Settings settings() { return new Settings(new ClaimService.Limits(100,3,20,100,1000000),Material.GOLDEN_SHOVEL,Material.STICK,120,duration,Set.of(),Map.of(),Map.of(),Map.of()); }
+        public Settings settings() { return new Settings(new ClaimService.Limits(100,3,20,100,1000000),Material.STICK,Material.BONE,Material.FEATHER,120,duration,Set.of(),Map.of(),Map.of(),Map.of()); }
         public Messages messages() { return Messages.defaults(); }
         public ClaimState state() { return state; }
         public Claim at(Location location) { return new ClaimIndex(state).at(location.getWorld().getUID(),location.getBlockX(),location.getBlockY(),location.getBlockZ()); }
@@ -88,13 +91,13 @@ class SelectionManagerTest {
         h.click(2,64,2); assertEquals(new Bounds(2,9,2,9,null,null),h.state.require(original.id()).bounds()); assertEquals(1,h.attempts);
     }
     @Test void threeDimensionalChildSelectionAutoCreates() {
-        Harness h=new Harness(); Claim root=root(0,9); h.state=state(root); var selection=h.manager.session(h.player); selection.mode="3d"; selection.parent=root.id();
-        h.click(1,10,1); h.click(3,12,3); Claim child=h.state.children(root.id()).getFirst();
+        Harness h=new Harness(); Claim root=root(0,9); h.state=state(root);
+        h.childClick(1,10,1); h.childClick(3,12,3); Claim child=h.state.children(root.id()).getFirst();
         assertEquals(new Bounds(1,3,1,3,10,12),child.bounds()); assertEquals(100,h.state.used(OWNER));
     }
     @Test void rootCornerInChildModeDoesNotResizeParent() {
-        Harness h=new Harness(); Claim root=root(0,9); h.state=state(root); var selection=h.manager.session(h.player); selection.mode="full"; selection.parent=root.id();
-        h.click(0,64,0); assertNull(h.manager.session(h.player).resize); h.click(2,64,2);
+        Harness h=new Harness(); Claim root=root(0,9); h.state=state(root);
+        h.childClick(0,64,0); assertNull(h.manager.session(h.player).resize); h.childClick(2,64,2);
         assertEquals(root,h.state.require(root.id())); assertEquals(1,h.state.children(root.id()).size());
     }
     @Test void crossWorldSecondCornerIsRejectedWithoutLosingFirst() {
@@ -108,13 +111,12 @@ class SelectionManagerTest {
         h.click(9,70,9); assertEquals(new Bounds(0,9,0,9,null,null),h.borders.getLast());
         assertTrue(h.state.claims().values().iterator().next().bounds().fullHeight());
     }
-    @Test void childHeightIsInferredEvenWithLegacyModeValues() {
-        for(String mode:List.of("child","full","3d")) for(boolean sameY:List.of(true,false)) {
+    @Test void childToolInfersHeightWithoutModeCommands() {
+        for(boolean sameY:List.of(true,false)) {
             Harness h=new Harness(); Claim root=root(0,9); h.state=state(root);
-            var selection=h.manager.session(h.player); selection.mode=mode; selection.parent=root.id();
-            h.click(1,20,1); h.click(3,sameY?20:22,3);
+            h.childClick(1,20,1); h.childClick(3,sameY?20:22,3);
             Bounds bounds=h.state.children(root.id()).getFirst().bounds();
-            assertEquals(sameY,bounds.fullHeight(),mode);
+            assertEquals(sameY,bounds.fullHeight());
             if(!sameY) { assertEquals(20,bounds.minY()); assertEquals(22,bounds.maxY()); }
         }
     }
@@ -162,8 +164,34 @@ class SelectionManagerTest {
     @Test void childSelectionRejectsExistingChildInterior() {
         Harness h=new Harness(); Claim parent=root(0,9);
         Claim child=new Claim(UUID.randomUUID(),WORLD,null,parent.id(),new Bounds(1,5,1,5,null,null),true,1,0,Map.of(),Map.of()); h.state=state(parent,child);
-        var selection=h.manager.session(h.player); selection.mode="child"; selection.parent=parent.id();
-        h.click(3,64,3); assertNull(selection.first); assertEquals(child.bounds(),h.borders.getLast());
+        h.childClick(3,64,3); assertNull(h.manager.session(h.player).first); assertEquals(child.bounds(),h.borders.getLast());
         assertEquals(List.of("This land is already claimed by Alex."),h.denials);
+    }
+    @Test void childToolInWildernessCannotStartSelection() {
+        Harness h=new Harness(); h.childClick(1,64,1);
+        assertNull(h.manager.session(h.player).first); assertEquals(0,h.attempts);
+        assertEquals(List.of("Use the child claim tool inside your parent claim."),h.denials);
+    }
+    @Test void changingToolsResetsPartialSelectionAndChoosesParentFromFirstClick() {
+        Harness h=new Harness(); Claim parent=root(0,9); h.state=state(parent);
+        h.click(20,64,20); h.childClick(1,64,1);
+        assertEquals(h.point(1,64,1),h.manager.session(h.player).first);
+        assertEquals(parent.id(),h.manager.session(h.player).parent);
+        h.click(30,64,30); assertEquals("basic",h.manager.session(h.player).mode);
+        assertNull(h.manager.session(h.player).parent); assertEquals(h.point(30,64,30),h.manager.session(h.player).first);
+    }
+    @Test void resizeKeepsOldBorderUntilSuccessfulCommitAndAfterInvalidAttempt() {
+        Harness h=new Harness(); Claim original=root(0,9); h.state=state(original);
+        h.click(0,64,0); assertEquals(original.bounds(),h.borders.getLast());
+        h.click(-1,64,-1); assertEquals(original.bounds(),h.borders.getLast());
+        assertEquals(original.bounds(),h.state.require(original.id()).bounds());
+        h.click(2,64,2); assertEquals(new Bounds(2,9,2,9,null,null),h.borders.getLast());
+    }
+    @Test void childToolResizesExistingChildWhileShowingOldCuboid() {
+        Harness h=new Harness(); Claim parent=root(0,9),child=child(parent,10,20); h.state=state(parent,child);
+        h.childClick(1,10,1); assertEquals(child.id(),h.manager.session(h.player).resize);
+        assertEquals(child.bounds(),h.borders.getLast());
+        h.childClick(0,9,0); assertEquals(new Bounds(0,4,0,4,9,20),h.state.require(child.id()).bounds());
+        assertEquals(h.state.require(child.id()).bounds(),h.borders.getLast());
     }
 }

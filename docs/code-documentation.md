@@ -21,6 +21,7 @@ The plugin implements SQLite-backed root/child claims, selection tools, area all
 | `storage/SqliteStore.java` | Single SQLite connection, schema v1, transactional deltas, integrity checks, and backups. |
 | `selection/SelectionManager.java` | Transient corner/mode/resize state and bounded particle previews. |
 | `command/ClaimCommands.java` | Executable paths, per-path permission registration, help/completion, management, and confirmations. |
+| `command/ClaimView.java` | Normalized corners/dimensions, ordered owner claim trees, and grouped trust presentation. |
 | `command/DeleteConfirmations.java` | Sender-bound deletion snapshots, original permissions, and expiry without public tokens. |
 | `claim/ClaimTargets.java` | Owner/context/location resolution with explicit ambiguity checks. |
 | `message/HumanNames.java` | Player/world names and owner/bounds descriptions for outgoing identifiers. |
@@ -57,6 +58,8 @@ Trust and flag changes increment claim revisions. Deletion confirmations bind se
 
 Selection bounds always make roots full height; child Y bounds are absent for equal corner Y, otherwise inclusive min/max Y. Particle previews are separate from selection sessions, so successful submission retains the final border. Each player has at most one preview. The first corner outlines its block, the second replaces that with the inferred bounds. One shared 10-tick task repeats previews until their configured wall-clock expiry; rendering remains bounded and distance-limited. Cancel, quit, world changes, disable, and successful reload clear previews. `particle-duration-seconds` accepts integers 0–300, with 0 disabling particles and 10 as the default.
 
+Tool material chooses regular or child selection directly; there are no mode commands. `toolSession` resets partial selection when the tool changes, and `selectParent` binds child selection to the root under the first click. Settings validate three distinct item materials, including `tools.child-selection`. Resize sessions preview committed old bounds while selecting/retrying. The resize transaction's post-commit callback shows replacement bounds only after state/index publication; rejected or failed saves never display a successfully resized claim.
+
 Protection checks perform no database I/O. Claims are bounded to 65,536 indexed chunks each; ordinary area/count limits are configurable. Index rebuilding and global validation occur on mutation/startup, not per protection event. Very large datasets still require server profiling.
 
 ## Message delivery
@@ -65,9 +68,11 @@ All player/console chat responses flow through `Messages`, including help/list o
 
 Player names and claim locations form the public command/message interface. Stable UUIDs remain internal database keys. `HumanNames` renders identifiers in final outgoing lines, including custom legacy templates and diagnostic maps; missing names use configurable friendly labels. Deleted claims capture their display description before removal.
 
+`ClaimView` renders inclusive dimensions and normalized minimum/maximum corners. Full-height claims use a label rather than invented Y bounds. Owned lists include each parent followed by its children. Info renders every assignable trust level with names/empty groups, separately for local and inherited parent grants, only when the sender has Manage/owner or explicit administrative inspection authority. Contextual trust targeting remains child-first through `ClaimIndex` and `ClaimTargets`; no bulk trust operations exist.
+
 Tool clicks check occupied land before altering selection positions. A rejected click replaces the particle preview with that claim's border and reports its owner's name. Legitimate owned-corner resize operations and child selection in the selected parent remain allowed; domain overlap validation still checks the entire resulting area.
 
-Startup/reload share `ConfigurationPipeline`. Editable resources have independent versions: `config.yml` is version 2 and `messages.yml` is version 5; unversioned files start at 0. The pipeline saves only changed files using sensitive exact backups, detects concurrent edits, and publishes one immutable `RuntimeConfiguration` only after file saving and runtime application. See [Configuration versions and recovery](configuration-versioning.md) for validation, history, and multi-file recovery limits.
+Startup/reload share `ConfigurationPipeline`. Editable resources have independent versions: `config.yml` is version 5 and `messages.yml` is version 7; unversioned files start at 0. The pipeline saves only changed files using sensitive exact backups, detects concurrent edits, and publishes one immutable `RuntimeConfiguration` only after file saving and runtime application. See [Configuration versions and recovery](configuration-versioning.md) for validation, history, and multi-file recovery limits.
 
 ## Plugin metadata
 

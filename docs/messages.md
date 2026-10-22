@@ -30,6 +30,10 @@ Version 4 adds `selection.already-claimed: 'This land is already claimed by {own
 
 Version 5 adds `commands.confirm-reset-all` (`{count}`, `{seconds}`), `success.reset-all` (`{count}`), and `errors.reset-changed` for server-wide claim reset. Counts include both parents and children. Existing templates/prefixes are preserved with no renamed, removed, or intentionally replaced paths. `config.yml` and the database schema do not change.
 
+Version 6 updates only exact stock `commands.tool`, `errors.selection-mode`, and `errors.select-root` instructions to separate tools. The tool template adds `{child-selection}`; customized tool templates may still omit it. Obsolete `commands.mode-basic`, `commands.mode-child`, and `errors.child-mode` paths are removed during reconciliation and retained in backups. Custom values on remaining paths and the prefix are preserved; no paths are renamed.
+
+Version 7 expands exact stock `commands.list-entry`, `commands.bounds`, and `commands.trust-list` templates. It adds corner lines, grouped trust/owner/source lines, an empty-list response, and local/inherited labels. List/bounds rendering supplies `{width}`, `{length}`, `{height}`, `{corner1}` and `{corner2}`. Custom templates and prefix remain preserved; legacy list `{id}`, bounds `{bounds}`, and trust-list `{grants}` remain valid. No paths are renamed or removed. Local and inherited trust groups are distinct, with all four assignable levels shown even when empty.
+
 ## Reload and implementation
 
 `/claima reload` requires `saltyclaims.command.claima.reload`. It uses the same versioning, migration, validation, backup and save pipeline as startup. It publishes the immutable bundle after saving and runtime application succeed. Failure keeps the previous runtime; completed file upgrades remain saved if a later save/application fails. Invalid startup files prevent dependent services starting and enter maintenance; fix them and restart. See [Configuration versions and recovery](configuration-versioning.md).

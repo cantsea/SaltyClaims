@@ -34,6 +34,9 @@ public final class Messages {
             if(entry.getKey().equals("commands.confirm-delete")) allowed.addAll(Set.of("token","id","seconds"));
             if(entry.getKey().equals("selection.preview")) allowed.add("command");
             if(entry.getKey().equals("errors.overlap")) allowed.addAll(Set.of("id","other"));
+            if(entry.getKey().equals("commands.list-entry")) allowed.add("id");
+            if(entry.getKey().equals("commands.bounds")) allowed.add("bounds");
+            if(entry.getKey().equals("commands.trust-list")) allowed.add("grants");
             if(!allowed.containsAll(placeholders(value))) throw ConfigException.at("messages.yml",entry.getKey(),"references an unsupported placeholder; use placeholders from the bundled template");
         }
         return new Messages(templates);

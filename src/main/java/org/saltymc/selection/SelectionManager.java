@@ -61,14 +61,39 @@ public final class SelectionManager implements Listener {
         Session s = session(p);
         if (first) { s.first = point.clone(); s.second = null; } else s.second = point.clone();
         plugin.messages().send(p,first?"selection.first-corner":"selection.second-corner","x",point.getBlockX(),"y",point.getBlockY(),"z",point.getBlockZ());
-        if(first) showFirst(p,s.first);
+        if(first) showSelection(p,s);
         if (s.first != null && s.second != null) {
-            Bounds b = bounds(p); plugin.showBounds(p,b,s.first.getWorld());
+            Bounds b = bounds(p);
+            if(s.resize==null) plugin.showBounds(p,b,s.first.getWorld());
             plugin.messages().send(p,"selection.preview","area",b.area(),"command","");
         }
     }
     private void showFirst(Player p,Location point) {
         plugin.showBounds(p,new Bounds(point.getBlockX(),point.getBlockX(),point.getBlockZ(),point.getBlockZ(),point.getBlockY(),point.getBlockY()),point.getWorld());
+    }
+    private void showSelection(Player player,Session selection) {
+        Claim resizing=selection.resize==null?null:plugin.state().claims().get(selection.resize);
+        if(resizing!=null) plugin.showBounds(player,resizing.bounds(),selection.first.getWorld());
+        else if(selection.first!=null) showFirst(player,selection.first);
+    }
+    private Session toolSession(Player player,boolean child) {
+        Session selection=session(player);
+        if(child==selection.mode.equals("basic")) {
+            cancel(player); selection=session(player); selection.mode=child?"child":"basic";
+        }
+        return selection;
+    }
+    private void selectParent(Player player,Session selection,Claim clicked) {
+        if(!selection.mode.equals("basic")&&(selection.first==null||selection.second!=null)) {
+            if(clicked==null) throw new MessageException("errors.select-root");
+            if(plugin.state().owner(clicked).equals(player.getUniqueId())) selection.parent=plugin.state().root(clicked).id();
+        }
+    }
+    public void manualPosition(Player player,boolean first,Location point,boolean child) {
+        Session selection=toolSession(player,child);
+        if(first) { selection.first=null; selection.second=null; selection.resize=null; }
+        selectParent(player,selection,plugin.at(point));
+        set(player,first,point);
     }
     /** Replace the sender's previous border and refresh its configured lifetime. */
     public void preview(Player p, Bounds b, World world) {
@@ -116,17 +141,21 @@ public final class SelectionManager implements Listener {
             e.setCancelled(true); Claim c = plugin.at(e.getClickedBlock().getLocation());
             if (c == null) plugin.messages().send(p,"selection.wilderness");
             else { plugin.messages().send(p,"selection.inspect","type",plugin.messages().text(c.root()?"labels.root":"labels.child"),"id",c.id(),"owner",plugin.state().owner(c)); preview(p,c.bounds(),p.getWorld()); }
-        } else if (held == plugin.settings().selectionTool()) {
+        } else if (held == plugin.settings().selectionTool()||held == plugin.settings().childSelectionTool()) {
             e.setCancelled(true);
-            selectCorner(p,e.getClickedBlock().getLocation());
+            selectCorner(p,e.getClickedBlock().getLocation(),held==plugin.settings().childSelectionTool());
         }
     }
     /** Both tool clicks enter here; no chat command or token is required to commit a complete selection. */
     public void selectCorner(Player p,Location point) {
+        selectCorner(p,point,false);
+    }
+    public void selectCorner(Player p,Location point,boolean childTool) {
         if(!plugin.ready()) return;
-        Session s=session(p);
+        Session s=toolSession(p,childTool);
             try {
                 Claim clicked=plugin.at(point);
+                selectParent(p,s,clicked);
                 if(clicked!=null) {
                     Claim target=s.mode.equals("basic")?plugin.state().root(clicked):clicked;
                     boolean beginning=s.first==null||s.second!=null;
@@ -145,11 +174,11 @@ public final class SelectionManager implements Listener {
                     Claim c = plugin.at(point);
                     if (c != null && s.mode.equals("basic")) c = plugin.state().root(c);
                     if (c != null && resizeCorner(p,s,c,point)) {
-                        s.resize = c.id(); s.revision = c.revision(); s.mode = c.root()?"basic":c.bounds().fullHeight()?"full":"3d";
+                        s.resize = c.id(); s.revision = c.revision(); s.mode = c.root()?"basic":"child";
                         Bounds b = c.bounds();
                         s.first = new Location(point.getWorld(),point.getBlockX()==b.minX()?b.maxX():b.minX(),
                                 b.fullHeight()?point.getBlockY():point.getBlockY()==b.minY()?b.maxY():b.minY(),point.getBlockZ()==b.minZ()?b.maxZ():b.minZ());
-                        showFirst(p,s.first); plugin.messages().send(p,"selection.resize"); return;
+                        showSelection(p,s); plugin.messages().send(p,"selection.resize"); return;
                     }
                     require(p, s.mode.equals("basic") ? "create" : "child.create");
                     set(p,true,point);
@@ -159,7 +188,7 @@ public final class SelectionManager implements Listener {
                 }
             } catch (IllegalArgumentException|ArithmeticException ex) {
                 s.second=null; // Preserve the first/opposite corner for a corrected second click.
-                if(s.first!=null) showFirst(p,s.first);
+                if(s.first!=null) showSelection(p,s);
                 plugin.deny(p,plugin.messages().error(ex));
             }
     }

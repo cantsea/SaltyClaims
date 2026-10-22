@@ -21,7 +21,7 @@ import java.util.*;
 /** All executable paths are independently permission-gated; roots have no blanket gate. */
 public final class ClaimCommands implements CommandExecutor, TabCompleter, Listener {
     public static final List<String> PLAYER_PATHS = List.of("help", "tool", "pos1", "pos2", "create", "resize", "cancel", "info", "list", "delete", "delete.confirm",
-            "trust", "untrust", "trustlist", "flags", "flag", "explain", "mode.basic", "mode.child", "child.create", "child.restrict");
+            "trust", "untrust", "trustlist", "flags", "flag", "explain", "child.create", "child.restrict");
     public static final List<String> ADMIN_PATHS = List.of("help", "inspect", "bypass", "delete", "resize", "trust", "untrust", "trustlist", "flag", "flags",
             "balance.show", "balance.set", "balance.add", "balance.remove", "reload", "backup", "delete.confirm", "reset.all", "reset.all.confirm");
     private final SaltyClaims plugin;
@@ -88,7 +88,7 @@ public final class ClaimCommands implements CommandExecutor, TabCompleter, Liste
             if (a.isEmpty()) a.add("help");
             if(admin&&explicit!=null) a.add(1,explicit);
             String path = a.getFirst().toLowerCase(Locale.ROOT);
-            if (Set.of("mode","child","balance","reset").contains(path)) path += "." + arg(a,1,"/"+label+" "+path+" <subcommand>").toLowerCase(Locale.ROOT);
+            if (Set.of("child","balance","reset").contains(path)) path += "." + arg(a,1,"/"+label+" "+path+" <subcommand>").toLowerCase(Locale.ROOT);
             if(path.equals("reset.all")&&a.size()>2&&a.get(2).equalsIgnoreCase("confirm")) path="reset.all.confirm";
             if(path.equals("delete")&&explicit==null&&a.size()>1&&a.get(1).equalsIgnoreCase("confirm")) path="delete.confirm";
             if (!(admin?ADMIN_PATHS:PLAYER_PATHS).contains(path)) throw new MessageException("errors.unknown-command","command",label);
@@ -120,24 +120,17 @@ public final class ClaimCommands implements CommandExecutor, TabCompleter, Liste
                 confirm(sender,admin); return true;
             }
             if (path.equals("cancel")) { plugin.selections().cancel(player(sender)); confirmations.clear(identity(sender)); messages().send(sender,"commands.cancelled"); return true; }
-            if (path.equals("tool")) { messages().send(sender,"commands.tool","selection",plugin.settings().selectionTool(),"inspection",plugin.settings().inspectionTool()); return true; }
+            if (path.equals("tool")) { messages().send(sender,"commands.tool","selection",plugin.settings().selectionTool(),"child-selection",plugin.settings().childSelectionTool(),"inspection",plugin.settings().inspectionTool()); return true; }
             if (path.startsWith("balance.")) { balance(sender,a,path.substring(8)); return true; }
             if (path.equals("list")) {
                 UUID who=player(sender).getUniqueId();
-                plugin.state().claims().values().stream().filter(c->c.root()&&c.owner().equals(who)).forEach(c->messages().send(sender,"commands.list-entry","id",c.id(),"area",c.bounds().area(),"world",plugin.worldName(c.world())));
+                List<Claim> owned=ClaimView.owned(plugin.state(),who);
+                if(owned.isEmpty()) messages().send(sender,"commands.no-claims");
+                for(Claim claim:owned) messages().send(sender,details("commands.list-entry",claim));
                 long total=plugin.state().accounts().getOrDefault(who,new ClaimState.Account(0,0)).total(plugin.settings().limits().starting());
                 messages().send(sender,"commands.allowance","used",plugin.state().used(who),"total",total); return true;
             }
-            if (path.equals("pos1")||path.equals("pos2")) { Player p=player(sender); plugin.selections().set(p,path.equals("pos1"),p.getLocation().getBlock().getLocation()); return true; }
-            if (path.equals("mode.basic")) { Player p=player(sender); plugin.selections().cancel(p); plugin.selections().session(p).mode="basic"; messages().send(sender,"commands.mode-basic"); return true; }
-            if (path.equals("mode.child")) {
-                Player p=player(sender); String mode=a.size()>2?a.get(2).toLowerCase(Locale.ROOT):"auto";
-                if (!Set.of("auto","full","3d").contains(mode)) throw new MessageException("errors.child-mode");
-                Claim parent=target(sender,explicit,explicitLocation,rootScope,false,a); owner(sender,plugin.state(),parent,false);
-                if (!parent.root()) throw new MessageException("errors.root-required");
-                plugin.selections().cancel(p); Session s=plugin.selections().session(p); s.mode="child"; s.parent=parent.id();
-                messages().send(sender,"commands.mode-child","mode","automatic","id",parent.id()); return true;
-            }
+            if (path.equals("pos1")||path.equals("pos2")) { Player p=player(sender); plugin.selections().manualPosition(p,path.equals("pos1"),p.getLocation().getBlock().getLocation(),p.getInventory().getItemInMainHand().getType()==plugin.settings().childSelectionTool()); return true; }
             if (path.equals("create")||path.equals("child.create")) { create(player(sender),path.equals("child.create")); return true; }
             Claim claim=target(sender,explicit,explicitLocation,rootScope,admin,a);
             if (path.equals("info")||path.equals("inspect")) { info(sender,claim,admin); return true; }
@@ -245,8 +238,10 @@ public final class ClaimCommands implements CommandExecutor, TabCompleter, Liste
             if(!session.first.getWorld().getUID().equals(claim.world())) throw new MessageException("errors.selection-world");
         }
         if(claim.root()) b=new Bounds(b.minX(),b.maxX(),b.minZ(),b.maxZ(),null,null);
-        validateWorld(world(claim),b); Claim replacement=claim.change(b,claim.inheritTrust(),claim.trust(),claim.flags());
-        plugin.mutate(sender,s->ClaimService.put(s,replacement,plugin.settings().limits(),admin),Notice.of("success.resized","id",claim.id()));
+        World resizeWorld=world(claim); validateWorld(resizeWorld,b); Claim replacement=claim.change(b,claim.inheritTrust(),claim.trust(),claim.flags());
+        plugin.mutate(sender,s->ClaimService.put(s,replacement,plugin.settings().limits(),admin),Notice.of("success.resized","id",claim.id()),()->{
+            if(sender instanceof Player p) plugin.selections().preview(p,replacement.bounds(),resizeWorld);
+        });
         if(sender instanceof Player p) plugin.selections().finish(p);
     }
     private void trust(CommandSender sender, Claim claim, List<String> args, boolean admin, boolean remove) {
@@ -261,17 +256,35 @@ public final class ClaimCommands implements CommandExecutor, TabCompleter, Liste
     private void showTrust(CommandSender sender, Claim claim) {
         String grants=claim.trust().entrySet().stream().map(entry->(entry.getKey().isPublic()?messages().text("labels.public"):plugin.playerName(entry.getKey().playerId()))+": "+entry.getValue().key()).sorted().collect(java.util.stream.Collectors.joining(", "));
         messages().send(sender,"commands.trust-list","id",claim.id(),"grants",grants.isEmpty()?messages().text("labels.none"):grants);
+        for(var group:ClaimView.trustGroups(claim,subject->subject.isPublic()?messages().text("labels.public"):plugin.playerName(subject.playerId())).entrySet()) {
+            String players=String.join(", ",group.getValue());
+            messages().send(sender,"commands.trust-level","level",group.getKey().key(),"players",players.isEmpty()?messages().text("labels.none"):players);
+        }
+    }
+    private Notice details(String key,Claim claim) {
+        return ClaimView.details(key,claim,plugin.worldName(claim.world()),messages().text("labels.full-height"),
+                messages().text(claim.root()?"labels.root":"labels.child"),plugin.state().children(claim.id()).size());
     }
     private void info(CommandSender sender, Claim claim, boolean admin) {
         messages().send(sender,"commands.info","type",messages().text(claim.root()?"labels.root":"labels.child"),"id",claim.id(),"owner",plugin.state().owner(claim),"parent",claim.parent()==null?messages().text("labels.none"):claim.parent());
-        messages().send(sender,"commands.bounds","bounds",claim.bounds(),"area",claim.bounds().area(),"children",plugin.state().children(claim.id()).size());
+        messages().send(sender,details("commands.corner-first",claim));
+        messages().send(sender,details("commands.corner-second",claim));
+        messages().send(sender,details("commands.bounds",claim));
         if(sender instanceof Player p) {
             messages().send(sender,"commands.your-trust","trust",plugin.state().trust(claim,p.getUniqueId()));
             World world=Bukkit.getWorld(claim.world()); if(world!=null) plugin.selections().preview(p,claim.bounds(),world);
         }
+        if(admin||sender instanceof Player p&&plugin.state().trust(claim,p.getUniqueId()).grants(Trust.MANAGE)) {
+            messages().send(sender,"commands.trust-owner","owner",plugin.playerName(plugin.state().owner(claim)));
+            messages().send(sender,"commands.trust-source","source",messages().text("labels.local")); showTrust(sender,claim);
+            if(!claim.root()) {
+                messages().send(sender,"commands.inherit-trust","enabled",claim.inheritTrust());
+                if(claim.inheritTrust()) { messages().send(sender,"commands.trust-source","source",messages().text("labels.inherited")); showTrust(sender,plugin.state().root(claim)); }
+            }
+        }
         if(admin) {
-            showTrust(sender,claim); messages().send(sender,"commands.local-flags","flags",claim.flags());
-            if(!claim.root()) { messages().send(sender,"commands.inherit-trust","enabled",claim.inheritTrust()); showTrust(sender,plugin.state().root(claim)); messages().send(sender,"commands.root-flags","flags",plugin.state().root(claim).flags()); }
+            messages().send(sender,"commands.local-flags","flags",claim.flags());
+            if(!claim.root()) messages().send(sender,"commands.root-flags","flags",plugin.state().root(claim).flags());
         }
     }
     private static String identity(CommandSender sender) { return sender instanceof Player p?p.getUniqueId().toString():"console:"+sender.getName(); }
@@ -312,11 +325,11 @@ public final class ClaimCommands implements CommandExecutor, TabCompleter, Liste
             String action=args[0].toLowerCase(Locale.ROOT);
             boolean allowed=sender.hasPermission(permission(admin,action));
             boolean ownerArgument=args.length==2&&(admin&&Set.of("inspect","resize","delete","trust","untrust","trustlist","flag","flags").contains(action)||!admin&&action.equals("info"));
-            boolean trustArgument=(action.equals("trust")||action.equals("untrust"))&&args.length==(admin?3:2);
+            boolean trustArgument=Set.of("trust","untrust").contains(action)&&args.length==(admin?3:2);
             if(allowed&&(ownerArgument||trustArgument||args[args.length-2].equals("--owner"))) {
                 Bukkit.getOnlinePlayers().forEach(player->options.add(player.getName()));
                 plugin.state().claims().values().stream().filter(Claim::root).map(Claim::owner).distinct().map(plugin::playerName).filter(HumanNames::validPlayerName).forEach(options::add);
-                if(trustArgument) { options.add("public"); if(action.equals("untrust")) options.add("all"); }
+                if(trustArgument) { options.add("public"); if(action.startsWith("untrust")) options.add("all"); }
             }
         }
         return options.stream().filter(s->s.toLowerCase(Locale.ROOT).startsWith(prefix)).distinct().sorted().toList();

@@ -10,6 +10,8 @@ Confirmed requirements are single-server storage, lightweight protection, full-h
 
 Selection interaction now infers child height: equal Y corners produce full-height children; different Y corners produce bounded 3D children. Roots remain full height. A configurable timed particle border outlines position 1, expands to position 2, and repeats for `particle-duration-seconds` (default 10). Deletion prompts distinguish a claim from a child claim and require the corresponding `delete confirm` command.
 
+Selection now uses distinct configurable regular and child tools (stick and bone by default), with no mode commands. The first child-tool click selects its parent automatically. Resize selection retains the entire old border until the replacement is saved successfully, subject to the particle duration.
+
 Deliver usable root claims first, then child claims as a separate milestone. Design persistence and authorization for both from the beginning.
 
 ## GriefPrevention reference
@@ -28,7 +30,7 @@ The upstream documentation describes ongoing v17+ changes. These are references 
 ### Root claims
 
 - A root claim owns an inclusive X/Z rectangle across the world's entire buildable height.
-- Proposed default tool: golden shovel for selection and resizing, stick for inspection; both configurable.
+- Default tools: stick for root selection/resizing, bone for child selection/resizing, and feather for inspection; all configurable.
 - Select opposite corners with the tool; the second click immediately attempts a validated claim and shows borders/cost. Rejection retains the first corner for retry. Clicking an existing owned corner enters resize mode, and its next click attempts the resize.
 - Inspection reports claim ID, owner, root/child context, and effective access, with temporary client-side boundary visuals. It never changes real blocks.
 - Commands provide alternatives for selecting corners, creating, resizing, inspecting, listing, and deleting claims.

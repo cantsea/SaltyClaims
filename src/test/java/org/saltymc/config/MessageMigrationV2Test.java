@@ -11,8 +11,8 @@ class MessageMigrationV2Test {
     @Test void upgradesStockInstructionsAndKeepsIndependentVersions() {
         var candidate=prepare("prefix: '[Custom] '\ncommands:\n  tool: 'Select with {selection}, inspect with {inspection}. Right-click two corners, then /claim create. Click an owned corner to resize.'\n  confirm-delete: 'Delete {type} {id}? Within {seconds} seconds: /{command} confirm {token}'\nselection:\n  preview: 'Area {area}; use {command} to save.'\nconfig-version: 1\n");
         Messages messages=Messages.from(candidate.document());
-        assertEquals(1,candidate.from()); assertEquals(ConfigFiles.messagesFile().version(),candidate.to()); assertEquals(2,ConfigFiles.settingsFile().version());
-        assertTrue(messages.text("commands.tool","selection","SHOVEL","inspection","STICK").contains("claim immediately"));
+        assertEquals(1,candidate.from()); assertEquals(ConfigFiles.messagesFile().version(),candidate.to()); assertEquals(5,ConfigFiles.settingsFile().version());
+        assertTrue(messages.text("commands.tool","selection","SHOVEL","inspection","STICK").contains("immediately"));
         assertEquals("Selected area: 25 blocks.",messages.text("selection.preview","area",25));
         String confirmation=messages.text("commands.confirm-delete","type","Root","id","Alex","seconds",30,"command","claim","token","");
         assertTrue(confirmation.equals("Type /claim delete confirm to delete this Root.")); assertTrue(messages.lines(Notice.of("selection.wilderness")).getFirst().startsWith("[Custom] "));

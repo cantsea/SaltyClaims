@@ -8,11 +8,11 @@ import java.nio.file.Files;
 import java.util.*;
 
 /** Fully validated immutable settings; supplied values never use coercing/fallback getters. */
-public record Settings(ClaimService.Limits limits,Material selectionTool,Material inspectionTool,
+public record Settings(ClaimService.Limits limits,Material selectionTool,Material childSelectionTool,Material inspectionTool,
                        int sessionSeconds,int previewSeconds,Set<String> disabledWorlds,Map<Flag,String> defaults,
                        Map<Flag,String> enforced,Map<String,Map<Flag,String>> worlds) {
     public Settings {
-        Objects.requireNonNull(limits); Objects.requireNonNull(selectionTool); Objects.requireNonNull(inspectionTool);
+        Objects.requireNonNull(limits); Objects.requireNonNull(selectionTool); Objects.requireNonNull(childSelectionTool); Objects.requireNonNull(inspectionTool);
         disabledWorlds=Set.copyOf(disabledWorlds); defaults=Map.copyOf(defaults); enforced=Map.copyOf(enforced);
         Map<String,Map<Flag,String>> copy=new LinkedHashMap<>(); worlds.forEach((key,value)->copy.put(key,Map.copyOf(value))); worlds=Map.copyOf(copy);
     }
@@ -27,8 +27,8 @@ public record Settings(ClaimService.Limits limits,Material selectionTool,Materia
         int roots=(int)integer(claims,"maximum-roots","claims.maximum-roots",1,1000000);
         int children=(int)integer(claims,"maximum-children","claims.maximum-children",0,1000000);
         long area=integer(claims,"maximum-area","claims.maximum-area",1,Long.MAX_VALUE);
-        Material select=material(tools,"selection"),inspect=material(tools,"inspection");
-        if(select==inspect) throw ConfigException.at("config.yml","tools","requires distinct selection and inspection items");
+        Material select=material(tools,"selection"),childSelect=material(tools,"child-selection"),inspect=material(tools,"inspection");
+        if(select==inspect||select==childSelect||childSelect==inspect) throw ConfigException.at("config.yml","tools","requires distinct selection, child-selection and inspection items");
         int timeout=(int)integer(data,"selection-timeout-seconds","selection-timeout-seconds",10,3600);
         int preview=(int)integer(data,"particle-duration-seconds","particle-duration-seconds",0,300);
         Object disabled=data.get("disabled-worlds");
@@ -44,7 +44,7 @@ public record Settings(ClaimService.Limits limits,Material selectionTool,Materia
             if(entry.getKey().isBlank()) throw ConfigException.at("config.yml","worlds","requires nonempty world names");
             worlds.put(entry.getKey(),flags(YamlData.map(entry.getValue(),"config.yml","worlds."+entry.getKey()),"worlds."+entry.getKey()));
         }
-        return new Settings(new ClaimService.Limits(starting,width,roots,children,area),select,inspect,timeout,preview,disabledWorlds,
+        return new Settings(new ClaimService.Limits(starting,width,roots,children,area),select,childSelect,inspect,timeout,preview,disabledWorlds,
                 flags(YamlData.map(flagSection.get("defaults"),"config.yml","flags.defaults"),"flags.defaults"),
                 flags(YamlData.map(flagSection.get("enforced"),"config.yml","flags.enforced"),"flags.enforced"),worlds);
     }
@@ -67,6 +67,7 @@ public record Settings(ClaimService.Limits limits,Material selectionTool,Materia
     /** Item eligibility requires Paper registries; run as preflight before saving. */
     public void validateLiveTools() {
         if(!selectionTool.isItem()) throw ConfigException.at("config.yml","tools.selection","must reference an item");
+        if(!childSelectionTool.isItem()) throw ConfigException.at("config.yml","tools.child-selection","must reference an item");
         if(!inspectionTool.isItem()) throw ConfigException.at("config.yml","tools.inspection","must reference an item");
     }
     private static Map<Flag,String> flags(Map<String,Object> data,String path) {

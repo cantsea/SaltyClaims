@@ -19,7 +19,7 @@ class MessagesTest {
     @Test void emptyPrefixAndSuppressedMessages() throws Exception {
         Messages messages=load("prefix: ''\nselection:\n  wilderness: ''\n");
         assertEquals(List.of(),messages.lines(Notice.of("selection.wilderness")));
-        assertEquals(List.of("Root selection mode."),messages.lines(Notice.of("commands.mode-basic")));
+        assertEquals(List.of("Configuration and messages validated and reloaded."),messages.lines(Notice.of("commands.reloaded")));
     }
     @Test void everyLineGetsExactlyOnePrefix() throws Exception {
         Messages messages=load("prefix: '[C] '\ncommands:\n  help-player: |\n    First line\n    Second line\n");

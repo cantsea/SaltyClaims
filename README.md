@@ -16,16 +16,16 @@ On Linux/macOS, run `bash gradlew build`. Copy `build/libs/SaltyClaims-1.0-SNAPS
 
 ## Claim land
 
-1. Right-click two opposite block corners with a golden shovel. The second click immediately attempts creation, checking allowance, overlap, and claim limits.
+1. Right-click two opposite block corners with a stick. The second click immediately attempts creation, checking allowance, overlap, and claim limits.
 2. If creation is rejected, read the denial and choose another second corner. For manual selection, use `/claim pos1`, `/claim pos2`, then `/claim create`.
-3. Inspect with a stick or `/claim info`; view allowance with `/claim list`.
-4. To resize, right-click an owned corner with the shovel, then its new position. The second click attempts the resize immediately. Manual selections can still be applied with `/claim resize`.
+3. Inspect with a feather or `/claim info`; view allowance with `/claim list`.
+4. To resize, right-click an owned corner with the matching claim tool, then its new position. The old border stays visible while selecting and after rejected attempts; the new border appears after a successful save. Manual selections can still be applied with `/claim resize`.
 
 Defaults: 10,000 starting claim blocks, 20 roots, 100 children per root, and a minimum X/Z width of three. Root area is charged once; children are free. Playtime accrual is not implemented. Configure limits and tool items in `plugins/SaltyClaims/config.yml`.
 
 Particles first outline the selected block, then expand to the selected rectangle or cuboid. `particle-duration-seconds: 10` controls how long the current border repeats after a selection or inspection; set it to `0` to disable particles (range 0–300). New previews replace the previous border, and `/claim cancel`, disconnecting, changing worlds, or a successful reload clears it.
 
-Right-clicking claimed land with the shovel shows its border and `This land is already claimed by <owner>.` without changing either selected position. Owned-corner resizing and child selection within the selected parent are allowed. Even when both corners are outside another claim, creation still checks the entire rectangle for overlaps.
+Right-clicking claimed land with the regular claim tool shows its border and `This land is already claimed by <owner>.` without changing either selected position. Owned-corner resizing and child selection within the selected parent are allowed. Even when both corners are outside another claim, creation still checks the entire rectangle for overlaps.
 
 ## Trust, children, and flags
 
@@ -38,7 +38,7 @@ Right-clicking claimed land with the shovel shows its border and `This land is a
 /claim trustlist
 /claim untrust Alex
 
-/claim mode child --root
+# Use the bone inside your parent claim; no mode command is needed.
 # Right-click two corners: same Y creates a full-height child; different Y creates a 3D child.
 /claim child restrict on
 
@@ -50,6 +50,12 @@ Right-clicking claimed land with the shovel shows its border and `This land is a
 ```
 
 Commands act on the child at your location, otherwise the root. Use `--root`, `--owner <player>`, or `--at <world> <x> <y> <z>` for explicit targeting. An owner name selects their sole root remotely; multiple claims require a location. Commands and messages use player names and claim locations. Children cannot contain children. Restricting a child disables parent trust inheritance, while flags continue to inherit. Managers can delegate lower trust, but ownership, geometry, flag edits, and manager assignment remain owner-only.
+
+`/claim info` shows both normalized corners, width/length, area, height, and child count. Owners/managers also see the owner and every assignable trust level, including empty levels, with local and inherited parent grants shown separately. `/claim list` lists each owned parent followed by its children, with sizes and both corners; only parent areas count toward the allowance. Full-height claims display `full height` in place of bounded Y coordinates. Trust commands edit only the selected child or parent.
+
+Regular claims use `tools.selection: STICK`; child claims use `tools.child-selection: BONE`; inspection uses `tools.inspection: FEATHER`. All three items must be distinct. The child tool chooses its parent from the first clicked block. Switching claim tools starts a fresh selection. `/claim mode basic` and `/claim mode child` have been removed.
+
+`config.yml` includes a commented reference for every flag, its built-in default, and its effect, along with cumulative trust levels and their default access. Flags may change the access required for each action.
 
 To delete, run `/claim delete`. The response is `Type /claim delete confirm to delete this claim.` (or `child claim`). Run that command within 30 seconds. Confirmation remains bound to the original claim/tree even if you move; deleting a parent also removes its children.
 

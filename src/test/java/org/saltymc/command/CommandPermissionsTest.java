@@ -73,4 +73,21 @@ class CommandPermissionsTest {
         CommandSender confirmer=sender(Set.of("saltyclaims.command.claima.reset.all.confirm"),new ArrayList<>());
         assertEquals(List.of("confirm"),commands.onTabComplete(confirmer,command("claima"),"claima",new String[]{"reset","all",""}));
     }
+    @Test void modeCommandsAreRemovedFromExecutionAndCompletion() {
+        ClaimCommands commands=new ClaimCommands(null); List<String> messages=new ArrayList<>();
+        CommandSender sender=sender(Set.of("saltyclaims.command.claim.mode.basic","saltyclaims.command.claim.mode.child"),messages);
+        commands.onCommand(sender,command("claim"),"claim",new String[]{"mode","child"});
+        assertEquals(List.of("[SaltyClaims] Unknown subcommand. Use /claim help."),messages);
+        assertFalse(ClaimCommands.PLAYER_PATHS.stream().anyMatch(path->path.startsWith("mode")));
+        assertTrue(commands.onTabComplete(sender,command("claim"),"claim",new String[]{"mode",""}).isEmpty());
+    }
+    @Test void bulkTrustCommandsAreUnavailable() {
+        ClaimCommands commands=new ClaimCommands(null);
+        for(String route:List.of("trustall","untrustall")) {
+            List<String> messages=new ArrayList<>();
+            commands.onCommand(sender(Set.of(),messages),command("claim"),"claim",new String[]{route,"Alex"});
+            assertEquals(List.of("[SaltyClaims] Unknown subcommand. Use /claim help."),messages);
+            assertFalse(ClaimCommands.PLAYER_PATHS.contains(route));
+        }
+    }
 }
