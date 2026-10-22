@@ -60,7 +60,7 @@ Right-clicking claimed land with the regular claim tool shows its border and `Th
 /claim flag container-use reset
 ```
 
-Commands act on the child at your location, otherwise the root. Use `--root`, `--owner <player>`, or `--at <world> <x> <y> <z>` for explicit targeting. An owner name selects their sole root remotely; multiple claims require a location. Commands and messages use player names and claim locations. Children cannot contain children. Restricting a child disables parent trust inheritance, while flags continue to inherit. Managers can delegate lower trust, but ownership, geometry, flag edits, and manager assignment remain owner-only.
+Commands act on the child at your location, otherwise the root. Use `--root`, `--owner <player>`, or `--at <world> <x> <y> <z>` for explicit targeting. An owner name selects their sole root remotely; multiple claims require a location. Commands and messages use player names and claim locations. Children cannot contain children. Owners and parent managers can create children. New children disable parent trust inheritance: the parent owner retains ownership, and a manager who creates the child receives a local Manage grant. Other parent members and public grants have no access. Existing children keep their saved inheritance setting. `/claim child restrict off` enables parent trust inheritance; flags continue to inherit independently. Managers can delegate lower trust, but resizing, ownership, flag edits, and manager assignment remain owner-only.
 
 `/claim info` shows who owns the claim, its corners and size. Owners/managers also see every assignable trust level, including empty levels, with access from the main claim listed separately. `/claim list` lists each owned claim followed by its child claims, with size and corners on two short lines; only main claim areas count toward the allowance. Full-height claims show X/Z corners; 3D child claims also show Y and height in their size. Trust commands edit only the selected child or main claim.
 
@@ -115,6 +115,8 @@ Changed originals receive exact, sensitive backups in `plugins/SaltyClaims/confi
 Backups are written to `plugins/SaltyClaims/backups/`. To restore, stop the server, preserve the current database, replace `claims.db` with a consistent backup, and restart. Backup retention is manual.
 
 ## Validation and documentation
+
+On your test server, run `/claima test` (permission `saltyclaims.command.claima.test`, default op). It benchmarks generated claim sets in the background and writes a log to `plugins/SaltyClaims/test-reports/`. Real claims and worlds are untouched. Repeat runs for a before/after baseline; `PASS` means correctness checks passed, not a guarantee of live-server performance. See [test instructions](docs/testing.md) for scenarios and how to interpret the timings.
 
 `gradlew test` exercises geometry, trust/delegation, flag precedence, command permission isolation, SQLite persistence, rollback, and backup restore. Event adapters compile against the target Paper API; live multiplayer protection testing is still required before production use.
 

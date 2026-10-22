@@ -1,5 +1,8 @@
 package org.saltymc.selection;
 
+import org.saltymc.trust.Subject;
+import org.saltymc.trust.Trust;
+
 import org.bukkit.*;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.*;
@@ -64,7 +67,8 @@ class SelectionManagerTest {
                 claim=old.change(bounds,old.inheritTrust(),old.trust(),old.flags());
             } else {
                 boolean root=selection.mode.equals("basic");
-                claim=new Claim(UUID.randomUUID(),selection.first.getWorld().getUID(),root?OWNER:null,root?null:selection.parent,bounds,true,1,0,Map.of(),Map.of());
+                claim=root?new Claim(UUID.randomUUID(),selection.first.getWorld().getUID(),OWNER,null,bounds,true,1,0,Map.of(),Map.of())
+                        :ClaimService.newChild(state,selection.parent,player.getUniqueId(),bounds,1);
             }
             state=ClaimService.put(state,claim,settings().limits(),false);
             if(selection.resize!=null) showBounds(player,claim.bounds(),world,!claim.root());
@@ -121,6 +125,34 @@ class SelectionManagerTest {
         Harness h=new Harness(); Claim root=root(0,9); h.state=state(root);
         h.childClick(0,64,0); assertNull(h.manager.session(h.player).resize); h.childClick(2,64,2);
         assertEquals(root,h.state.require(root.id())); assertEquals(1,h.state.children(root.id()).size());
+    }
+    @Test void parentManagerCanSelectAndCreateChildButBuilderCannot() {
+        for(var level:List.of(Trust.MANAGE,Trust.BUILD)) {
+            Harness h=new Harness();
+            Claim parent=new Claim(UUID.randomUUID(),WORLD,STRANGER,null,new Bounds(0,9,0,9,null,null),true,1,0,
+                    Map.of(new Subject(OWNER),level),Map.of());
+            h.state=state(parent);
+            h.childClick(1,10,1); h.childClick(3,12,3);
+            if(level==Trust.MANAGE) {
+                Claim child=h.state.children(parent.id()).getFirst();
+                assertFalse(child.inheritTrust());
+                assertEquals(Trust.MANAGE,h.state.trust(child,OWNER));
+                assertEquals(Trust.OWNER,h.state.trust(child,STRANGER));
+                assertTrue(h.denials.isEmpty());
+            } else {
+                assertTrue(h.state.children(parent.id()).isEmpty());
+                assertEquals(0,h.attempts);
+            }
+        }
+    }
+    @Test void revokedParentManagerCannotCompleteChildSelection() {
+        Harness h=new Harness();
+        Claim parent=new Claim(UUID.randomUUID(),WORLD,STRANGER,null,new Bounds(0,9,0,9,null,null),true,1,0,
+                Map.of(new Subject(OWNER),Trust.MANAGE),Map.of());
+        h.state=state(parent); h.childClick(1,10,1);
+        h.state=state(parent.change(parent.bounds(),true,Map.of(),Map.of()));
+        h.childClick(3,12,3);
+        assertEquals(0,h.attempts); assertTrue(h.state.children(parent.id()).isEmpty()); h.assertSelectionCleared();
     }
     @Test void crossWorldSecondCornerIsRejectedAndClearsSelection() {
         Harness h=new Harness(); h.click(0,64,0);

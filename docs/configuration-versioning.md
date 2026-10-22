@@ -2,7 +2,7 @@
 
 ## Independent versions
 
-The editable file registry is `config.ConfigFiles`. It currently manages `config.yml` and `messages.yml`, each with its own positive integer `config-version` as the last setting. Current versions are 6 for `config.yml` and 11 for `messages.yml`. These versions are independent of each other, the plugin release (`1.0-SNAPSHOT`), and SQLite's schema version. `plugin.yml` is packaged plugin metadata, not a runtime-editable settings file.
+The editable file registry is `config.ConfigFiles`. It currently manages `config.yml` and `messages.yml`, each with its own positive integer `config-version` as the last setting. Current versions are 6 for `config.yml` and 12 for `messages.yml`. These versions are independent of each other, the plugin release (`1.0-SNAPSHOT`), and SQLite's schema version. `plugin.yml` is packaged plugin metadata, not a runtime-editable settings file.
 
 Missing files are created from the current bundled resource after the whole bundle passes validation. Existing blank/comment-only files or mappings without `config-version` are legacy version 0. Explicit zero, negative, fractional, quoted, boolean, null, out-of-range, or future versions are rejected without overwriting supplied files. Do not manually change version numbers to bypass migrations or downgrade.
 
@@ -27,6 +27,7 @@ Missing files are created from the current bundled resource after the whole bund
 | `messages.yml` | 8 -> 9 | All remaining templates and prefixes | None | Remove obsolete `commands.explain`; no renamed paths or intentional replacements |
 | `messages.yml` | 9 -> 10 | Customized tool/help text and prefix | Claiming guide and commands heading | Rename commands.tool to commands.help-tools before pruning (conflicts rejected); intentionally replace only exact stock tool summary and help-player text |
 | `messages.yml` | 10 -> 11 | Every existing template and prefix | Immediate unclaim success and no-owned-claims messages | None; no renamed, removed, or intentionally replaced paths |
+| `messages.yml` | 11 -> 12 | All existing templates and prefix | Isolated benchmark start/completion/failure responses | None; no renamed, removed, or intentionally replaced paths |
 
 After migration, reconciliation removes obsolete paths in fixed-schema sections. It never resets a configured value merely because a bundled default changed. Step 2 explicitly replaces exact version-1 stock values for `commands.help-admin`, `commands.help-player`, `commands.tool`, `commands.confirm-delete`, `selection.preview`, `selection.resize`, `errors.unknown-player`, `errors.admin-target`, `errors.child-required`, `errors.no-claim`, and `errors.overlap`. Other wording remains configured. Across custom strings, exact `/{command} confirm {token}`, `/claim confirm {token}`, and `/claima confirm {token}` spellings become their corresponding `delete confirm` routes; `--id <uuid>` becomes `--owner <player>`. No configuration paths are renamed. Legacy deletion `{token}` and preview `{command}` placeholders remain valid with empty values. Config/database versions are unaffected.
 

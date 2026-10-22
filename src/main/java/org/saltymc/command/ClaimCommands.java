@@ -24,7 +24,7 @@ public final class ClaimCommands implements CommandExecutor, TabCompleter, Liste
     public static final List<String> PLAYER_PATHS = List.of("help", "resize", "cancel", "info", "list",
             "trust", "untrust", "trustlist", "flags", "flag", "child.create", "child.restrict");
     public static final List<String> ADMIN_PATHS = List.of("help", "inspect", "bypass", "delete", "resize", "trust", "untrust", "trustlist", "flag", "flags",
-            "balance.show", "balance.set", "balance.add", "balance.remove", "reload", "backup", "delete.confirm", "reset.all", "reset.all.confirm");
+            "balance.show", "balance.set", "balance.add", "balance.remove", "reload", "backup", "test", "delete.confirm", "reset.all", "reset.all.confirm");
     private final SaltyClaims plugin;
     private final DeleteConfirmations confirmations=new DeleteConfirmations();
     public ClaimCommands(SaltyClaims plugin) { this.plugin = plugin; }
@@ -118,6 +118,10 @@ public final class ClaimCommands implements CommandExecutor, TabCompleter, Liste
             }
             if (path.equals("reload")) { plugin.reloadSettings(); messages().send(sender,"commands.reloaded"); return true; }
             if (!plugin.ready()) throw new MessageException("errors.maintenance");
+            if(admin&&path.equals("test")) {
+                if(a.size()!=1||explicit!=null||rootScope||explicitLocation!=null) throw new MessageException("errors.usage","usage","/claima test");
+                plugin.runTests(sender); return true;
+            }
             if(admin&&path.startsWith("reset.all")) {
                 if(a.size()!=(path.equals("reset.all")?2:3)||explicit!=null||rootScope||explicitLocation!=null)
                     throw new MessageException("errors.usage","usage","/claima reset all [confirm]");
@@ -258,10 +262,11 @@ public final class ClaimCommands implements CommandExecutor, TabCompleter, Liste
         UUID parent=null;
         if(child) {
             if(selection.parent==null) throw new MessageException("errors.select-root");
-            Claim root=plugin.state().require(selection.parent); owner(p,plugin.state(),root,false);
+            Claim root=plugin.state().require(selection.parent); manager(p,root,false);
             if(!root.root()||!root.world().equals(world.getUID())) throw new MessageException("errors.child-world"); parent=root.id();
         }
-        Claim claim=new Claim(UUID.randomUUID(),world.getUID(),child?null:p.getUniqueId(),parent,bounds,true,System.currentTimeMillis(),0,Map.of(),Map.of());
+        Claim claim=child?ClaimService.newChild(plugin.state(),parent,p.getUniqueId(),bounds,System.currentTimeMillis())
+                :new Claim(UUID.randomUUID(),world.getUID(),p.getUniqueId(),null,bounds,true,System.currentTimeMillis(),0,Map.of(),Map.of());
         plugin.mutate(p,s->ClaimService.put(s,claim,plugin.settings().limits(),false),Notice.of("success.created","type",messages().text(child?"labels.child":"labels.root"),"id",claim.id()),()->{},()->plugin.selections().cancel(p));
         plugin.selections().finish(p);
     }

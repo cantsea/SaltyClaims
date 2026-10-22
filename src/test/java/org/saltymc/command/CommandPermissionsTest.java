@@ -141,4 +141,11 @@ class CommandPermissionsTest {
         assertTrue(messages.contains("[SaltyClaims] /unclaim")); assertTrue(messages.contains("[SaltyClaims] /unclaim all"));
         assertFalse(ClaimCommands.PLAYER_PATHS.contains("delete")); assertFalse(ClaimCommands.PLAYER_PATHS.contains("delete.confirm"));
     }
+    @Test void benchmarkHasItsOwnPermissionAndIsOnlySuggestedToAuthorizedStaff() {
+        ClaimCommands commands=new ClaimCommands(null); List<String> messages=new ArrayList<>();
+        commands.onCommand(sender(Set.of(ClaimCommands.permission(true,"backup")),messages),command("claima"),"claima",new String[]{"test"});
+        assertEquals(List.of("[SaltyClaims] You do not have permission to do that."),messages);
+        assertEquals(List.of("test"),commands.onTabComplete(sender(Set.of(ClaimCommands.permission(true,"test")),new ArrayList<>()),command("claima"),"claima",new String[]{"te"}));
+        assertTrue(commands.onTabComplete(sender(Set.of(),new ArrayList<>()),command("claima"),"claima",new String[]{"te"}).isEmpty());
+    }
 }

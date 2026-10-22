@@ -34,7 +34,7 @@ Player commands require a player sender. Context resolves to the child containin
 | `/claim trustlist` | Show local and inherited grants and sources. | `saltyclaims.command.claim.trustlist` | Owner or scoped Manage |
 | `/claim flags` | List effective flag values and their sources. | `saltyclaims.command.claim.flags` | Owner or scoped Manage |
 | `/claim flag <key> <value\|reset>` | Set or remove a local flag override. | `saltyclaims.command.claim.flag` plus `saltyclaims.flag.<key>` | Owner; server locks still apply |
-| `/claim child create` | Create a child inside the selected root. | `saltyclaims.command.claim.child.create` | Owner |
+| `/claim child create` | Create a child inside the selected root. | `saltyclaims.command.claim.child.create` | Owner or parent Manage |
 | `/claim child restrict <on\|off>` | Disable/enable inherited root trust. | `saltyclaims.command.claim.child.restrict` | Owner |
 
 Trust levels are `access`, `container`, `build`, and `manage`. Public cannot receive Manage. Managers may grant/revoke only Access, Container, and Build within their scope. If `/claim untrust all` is used by a manager, it removes only grants the manager is authorized to remove and reports retained Manage grants. Inherited grants are never deleted through child scope.
@@ -43,9 +43,9 @@ Every ordinary trust/untrust action targets the child containing the sender, oth
 
 Info shows normalized inclusive corner 1 (minimum X/Y/Z) and corner 2 (maximum X/Y/Z), rather than remembering click order. Full-height claims show labeled X/Z coordinates; bounded child claims also show Y. Owners and managers see the owner plus separate local/inherited lists for Access, Container, Build, and Manage, with `none` for empty levels. Restricted children show inheritance as disabled. List output places each parent before its children and uses two short lines with dimensions, area, world and both corners. Child areas are descriptive and are not charged again.
 
-Children use the normal info, resize, delete, trust, and flag commands once selected, each with its own command permission and the same claim authority checks. Creating a child requires that the selected parent is a root, never another child.
+Children use the normal info, resize, delete, trust, and flag commands once selected, each with its own command permission and the same claim authority checks. Creating a child requires that the selected parent is a root, never another child. New children start with parent trust inheritance disabled. The parent owner retains ownership, and a parent manager who creates a child receives a local Manage grant; no other parent player or public grants carry over. Existing children retain their saved settings. Owners can explicitly enable inheritance with `/claim child restrict off`.
 
-Regular selection uses the stick (`tools.selection`), child selection the bone (`tools.child-selection`), and inspection the feather (`tools.inspection`), with three distinct configurable items. The child tool selects the owning parent from the first click, so it must start inside the sender's parent claim. Switching away from either claim tool clears both corners, selected parent/resize state and its particle preview immediately. Returning to the tool starts a new selection. Cancelled item switches preserve selection. The mode commands and their `saltyclaims.command.claim.mode.basic` / `mode.child` permissions are removed. Tool actions retain their normal create/child-create/resize permissions.
+Regular selection uses the stick (`tools.selection`), child selection the bone (`tools.child-selection`), and inspection the feather (`tools.inspection`), with three distinct configurable items. The child tool selects the parent from the first click, so it must start inside a root the sender owns or manages. Switching away from either claim tool clears both corners, selected parent/resize state and its particle preview immediately. Returning to the tool starts a new selection. Cancelled item switches preserve selection. The mode commands and their `saltyclaims.command.claim.mode.basic` / `mode.child` permissions are removed. Tool actions retain their normal create/child-create/resize permissions.
 
 Parent selections always produce full-height rectangles regardless of corner Y. Child selections and tool resizes infer height from the two corners. An admin resize with explicit coordinates uses its supplied/existing Y bounds.
 
@@ -77,6 +77,7 @@ GP-style actions are exposed through `/claim` subcommands only. For example, `/c
 | `/claima balance remove <player> <amount>` | Remove bonus allowance, subject to balance validation. | `saltyclaims.command.claima.balance.remove` | Player or console |
 | `/claima reload` | Validate and apply configuration and messages together. | `saltyclaims.command.claima.reload` | Player or console |
 | `/claima backup` | Request a consistent database backup. | `saltyclaims.command.claima.backup` | Player or console |
+| `/claima test` | Run isolated synthetic claim benchmarks/checks and write a log in `test-reports/`. | `saltyclaims.command.claima.test` | Player or console |
 | `/claima delete confirm` | Confirm a bound administrative destructive action. | `saltyclaims.command.claima.delete.confirm` plus `saltyclaims.command.claima.delete` | Player or console |
 | `/claima reset all` | Request deletion of every parent/child claim on this server. | `saltyclaims.command.claima.reset.all` | Player or console |
 | `/claima reset all confirm` | Confirm that server-wide reset within 30 seconds. | `saltyclaims.command.claima.reset.all.confirm` plus `saltyclaims.command.claima.reset.all` | Player or console |

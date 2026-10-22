@@ -1,6 +1,8 @@
 package org.saltymc.claim;
 
 import org.saltymc.message.MessageException;
+import org.saltymc.trust.Subject;
+import org.saltymc.trust.Trust;
 
 import java.util.*;
 
@@ -13,6 +15,17 @@ public final class ClaimService {
         }
     }
     private ClaimService() { }
+    public static boolean canCreateChild(ClaimState state, Claim parent, UUID creator) {
+        return parent.root() && state.trust(parent, creator).grants(Trust.MANAGE);
+    }
+    /** New children keep the root owner implicitly and only the creator's local grant. */
+    public static Claim newChild(ClaimState state, UUID parent, UUID creator, Bounds bounds, long created) {
+        Claim root = state.require(parent);
+        if (!canCreateChild(state, root, creator)) throw new MessageException("errors.manage-required");
+        Trust level = state.trust(root, creator);
+        Map<Subject, Trust> grants = level.assignable() ? Map.of(new Subject(creator), level) : Map.of();
+        return new Claim(UUID.randomUUID(), root.world(), null, parent, bounds, false, created, 0, grants, Map.of());
+    }
     /** Remove all claim geometry, trust and flags; allowance accounts remain intact. */
     public static ClaimState resetAll(ClaimState state) { return new ClaimState(Map.of(),state.accounts()); }
     public static ClaimState put(ClaimState state, Claim claim, Limits limits, boolean staff) {

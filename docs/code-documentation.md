@@ -19,6 +19,7 @@ The plugin implements SQLite-backed root/child claims, selection tools, area all
 | `trust/` | Explicit player/public subjects, trust hierarchy, and scoped delegation rules. |
 | `flag/` | Typed flag definitions and pure policy precedence/authorization. |
 | `storage/SqliteStore.java` | Single SQLite connection, schema v1, transactional deltas, integrity checks, and backups. |
+| `diagnostics/ClaimBenchmark.java` | Bounded synthetic lookup/edit/SQLite benchmarks and correctness checks, independent of Bukkit/live state. |
 | `selection/SelectionManager.java` | Transient corner/mode/resize state and bounded particle previews. |
 | `command/ClaimCommands.java` | Executable paths, per-path permission registration, help/completion, management, and confirmations. |
 | `command/ClaimView.java` | Normalized corners/dimensions, ordered owner claim trees, and grouped trust presentation. |
@@ -80,7 +81,7 @@ Player help first renders a tool summary from runtime-configured materials, then
 
 Tool clicks check occupied land before altering selection positions. A rejected click clears the selection, then shows that existing claim's border and owner name. Legitimate owned-corner resize operations and child selection in the selected parent remain allowed; domain overlap validation still checks the entire resulting area.
 
-Startup/reload share `ConfigurationPipeline`. Editable resources have independent versions: `config.yml` is version 6 and `messages.yml` is version 11; unversioned files start at 0. The pipeline saves only changed files using sensitive exact backups, detects concurrent edits, and publishes one immutable `RuntimeConfiguration` only after file saving and runtime application. See [Configuration versions and recovery](configuration-versioning.md) for validation, history, and multi-file recovery limits.
+Startup/reload share `ConfigurationPipeline`. Editable resources have independent versions: `config.yml` is version 6 and `messages.yml` is version 12; unversioned files start at 0. The pipeline saves only changed files using sensitive exact backups, detects concurrent edits, and publishes one immutable `RuntimeConfiguration` only after file saving and runtime application. See [Configuration versions and recovery](configuration-versioning.md) for validation, history, and multi-file recovery limits.
 
 ## Plugin metadata
 
@@ -99,6 +100,8 @@ Startup/reload share `ConfigurationPipeline`. Editable resources have independen
 - Project coordinates: group `org.saltymc`, version `1.0-SNAPSHOT`.
 
 The complete wrapper is included. `gradlew build` compiles, tests, and packages the plugin; `gradlew runServer` downloads/starts the configured development server subject to its initial setup requirements. GitHub Actions builds with Java 25 and publishes the JAR artifact.
+
+`/claima test` captures non-sensitive environment strings on the server thread and runs `ClaimBenchmark` on a dedicated single worker, with an atomic overlapping-run guard. Reports use unique CREATE_NEW log files; synthetic databases live in separate temporary subdirectories and are cleaned after closing. Test failure is isolated from live storage failure state. The benchmark has capped datasets/work counts and interruption/deadline checks between operations. Its statistics describe background synthetic costs; see [Testing](testing.md) for interpretation and limits.
 
 The API adapters compile against the pinned target. A live Paper boot and two-client protection acceptance run remain unverified in this development session. Optional allowance accrual, economy, deeper nesting, and GP data import are not implemented; deeper nesting is explicitly outside scope.
 

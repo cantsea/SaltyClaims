@@ -4,6 +4,7 @@ prefix: '[SaltyClaims] '
 # {placeholders} are literal data: they cannot inject color codes or other placeholders.
 # Missing keys use the bundled default. Set a message to '' to suppress that response.
 commands:
+  test-started: 'Running claim tests in the background. This may take up to two minutes.'
   confirm-reset-all: 'Delete every claim? Type /claima reset all confirm within {seconds} seconds.'
   help-line: '{usage}'
   help-admin: 'Use the claim owner''s name to choose a claim.'
@@ -47,6 +48,7 @@ selection:
   inspect: 'This land is owned by {owner}'
   resize: 'Choose the new corner to resize this claim.'
 success:
+  test: 'Tests passed. Report: {file}'
   unclaimed: '{type} removed.'
   unclaimed-all: 'Removed all your claims.'
   reset-all: 'Deleted all {count} claims. Claim-block balances were kept.'
@@ -88,6 +90,9 @@ labels:
   full-height: 'full height'
   claim-reference: '{owner} at {x}, {z} ({world})'
 errors:
+  test-busy: 'A claim test is already running.'
+  test-failed: 'A claim test failed. Report: {file}'
+  test-report: 'Could not write the test report. Check the server log.'
   no-owned-claims: 'You have no claims.'
   reset-changed: 'A claim changed. Run /claima reset all again to confirm the reset.'
   missing-permission: 'You do not have permission to do that.'
@@ -158,4 +163,4 @@ errors:
   invalid-input: '{reason}'
 
 # Independent message-file schema version. Managed automatically; do not edit.
-config-version: 11
+config-version: 12

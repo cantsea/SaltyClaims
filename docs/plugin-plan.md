@@ -57,14 +57,14 @@ Support exactly one subdivision level: root -> child. A child cannot be a parent
 - Siblings cannot intersect in 3D. Stacked children may share an X/Z footprint when their inclusive Y ranges do not intersect. A full-height child conflicts with any sibling occupying its footprint.
 - A location resolves to its containing child, otherwise the root. This is deterministic because siblings cannot overlap.
 - Children do not cost additional claim blocks; apply configurable count and minimum-size limits.
-- The root owner retains ultimate control. Children do not have separate ownership or balances. Proposed first implementation permits only the owner or authorized staff to create, resize, delete, or configure children.
+- The root owner retains ultimate control. Children do not have separate ownership or balances. The owner and parent managers can create children; resizing, deletion, and owner-only configuration remain with the owner or authorized staff.
 - A root resize that would exclude a child is rejected. It never silently clips or deletes children.
 - Deleting a child removes its local trust and flags and restores the root's effective rules in that volume.
 - Deleting a root with children requires explicit confirmation and removes the entire tree in one transaction. Inspect/delete commands distinguish the current child from the root.
 
 ### Trust inheritance
 
-Children default to inheriting trust. For a subject, effective trust is the highest applicable grant among child, inherited root, and public grants. A weaker child grant does not reduce a stronger inherited grant.
+New children default to restricted trust. Only the parent owner and the parent manager who created the child (if applicable, with a local Manage grant) retain access. Existing children keep their saved inheritance setting. If the owner enables inheritance, effective trust is the highest applicable grant among child, inherited root, and public grants. A weaker child grant does not reduce a stronger inherited grant.
 
 A restricted child stops inheriting root trust grants, including root public grants. Local grants and local public trust still apply. The root owner and authorized staff remain able to manage it. Trust restriction does not reset flag inheritance.
 

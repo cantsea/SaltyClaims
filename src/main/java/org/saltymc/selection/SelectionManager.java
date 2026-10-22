@@ -89,7 +89,8 @@ public final class SelectionManager implements Listener {
     private void selectParent(Player player,Session selection,Claim clicked) {
         if(!selection.mode.equals("basic")&&(selection.first==null||selection.second!=null)) {
             if(clicked==null) throw new MessageException("errors.select-root");
-            if(plugin.state().owner(clicked).equals(player.getUniqueId())) selection.parent=plugin.state().root(clicked).id();
+            Claim root=plugin.state().root(clicked);
+            if(ClaimService.canCreateChild(plugin.state(),root,player.getUniqueId())) selection.parent=root.id();
         }
     }
     /** Replace the sender's previous border and refresh its configured lifetime. */
@@ -163,7 +164,8 @@ public final class SelectionManager implements Listener {
                     boolean resize=beginning&&resizeCorner(p,s,target,point);
                     boolean own=plugin.state().owner(target).equals(p.getUniqueId());
                     boolean currentResize=!beginning&&own&&target.id().equals(s.resize);
-                    boolean selectedParent=!s.mode.equals("basic")&&own&&target.root()&&target.id().equals(s.parent);
+                    boolean selectedParent=!s.mode.equals("basic")&&target.id().equals(s.parent)
+                            &&ClaimService.canCreateChild(plugin.state(),target,p.getUniqueId());
                     if(!resize&&!currentResize&&!selectedParent) {
                         cancel(p);
                         plugin.showBounds(p,clicked.bounds(),point.getWorld(),!clicked.root());

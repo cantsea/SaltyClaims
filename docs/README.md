@@ -8,6 +8,7 @@ SaltyClaims is a Paper Minecraft plugin providing SQLite-backed full-height root
 - [Configuration versions and recovery](configuration-versioning.md): independent file histories, strict validation, safe saves, backups, and future change requirements.
 - [Storage design](storage-design.md): single-server persistence, invariants, and save behavior.
 - [Protection coverage](protection-matrix.md): implemented event adapters and live acceptance checklist.
+- [Running claim tests](testing.md): `/claima test`, benchmark reports, scenarios, comparisons and measurement limits.
 - [Plugin plan](plugin-plan.md): original design, implementation status, and deferred features.
 
 This directory is tracked in Git. Keep it aligned with the implementation; label proposed behavior explicitly. Local AI working notes belong in the ignored root `AI/` directory.

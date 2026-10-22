@@ -18,9 +18,15 @@ import org.saltymc.flag.*;
 import org.saltymc.protection.ProtectionListener;
 import org.saltymc.selection.SelectionManager;
 import org.saltymc.storage.SqliteStore;
+import org.saltymc.diagnostics.ClaimBenchmark;
+import java.io.*;
+import java.nio.charset.StandardCharsets;
+import java.time.*;
+import java.time.format.DateTimeFormatter;
 import java.nio.file.*;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import java.util.logging.Level;
 
@@ -30,6 +36,8 @@ public final class SaltyClaims extends JavaPlugin implements Listener,SelectionM
     private ConfigurationPipeline<ConfigFiles.RuntimeConfiguration> configuration;
     private SqliteStore store;
     private ExecutorService worker;
+    private ExecutorService benchmarkWorker;
+    private final AtomicBoolean testing=new AtomicBoolean();
     private boolean ready, busy, writeFailed;
     private volatile boolean closing;
     private SelectionManager selections;
@@ -47,6 +55,7 @@ public final class SaltyClaims extends JavaPlugin implements Listener,SelectionM
             worker = Executors.newSingleThreadExecutor(r -> { Thread t = new Thread(r, "SaltyClaims-storage"); t.setDaemon(true); return t; });
             store = new SqliteStore(getDataFolder().toPath().resolve("claims.db"));
             state = store.load(); index = new ClaimIndex(state); ready = true;
+            benchmarkWorker=Executors.newSingleThreadExecutor(r->{ Thread thread=new Thread(r,"SaltyClaims-test"); thread.setDaemon(true); return thread; });
         } catch (ConfigException e) { getLogger().severe("Configuration startup rejected; maintenance active: "+e.getMessage()); }
         catch (Exception e) { getLogger().log(Level.SEVERE, "Storage startup failed. Maintenance mode is active; fix the error and restart.", e); }
         ClaimCommands commands = new ClaimCommands(this);
@@ -69,6 +78,7 @@ public final class SaltyClaims extends JavaPlugin implements Listener,SelectionM
     public void onDisable() {
         closing = true; ready = false;
         if(selections!=null) selections.clear();
+        if(benchmarkWorker!=null) benchmarkWorker.shutdownNow();
         if (worker == null) return;
         worker.shutdown();
         try {
@@ -158,6 +168,56 @@ public final class SaltyClaims extends JavaPlugin implements Listener,SelectionM
         if (!ready()) throw new MessageException("errors.restart-required");
         if (busy) throw new MessageException("errors.reload-busy");
         applyConfiguration();
+    }
+    /** All Bukkit/server information is captured here, on the server thread. The worker receives strings only. */
+    public void runTests(CommandSender sender) {
+        if(!ready()||benchmarkWorker==null) throw new MessageException("errors.maintenance");
+        if(!testing.compareAndSet(false,true)) throw new MessageException("errors.test-busy");
+        try {
+            Runtime runtime=Runtime.getRuntime();
+            List<String> environment=List.of("SaltyClaims synthetic performance/correctness test",
+                    "UTC start: "+Instant.now(),"Plugin: "+getPluginMeta().getVersion(),"Server: "+Bukkit.getVersion(),
+                    "Java: "+System.getProperty("java.version")+" / "+System.getProperty("java.vendor"),
+                    "OS: "+System.getProperty("os.name")+" / "+System.getProperty("os.arch"),
+                    "Available processors: "+runtime.availableProcessors(),"Heap maximum bytes: "+runtime.maxMemory(),
+                    "Online players at start: "+Bukkit.getOnlinePlayers().size(),"Live claims at start (count only): "+state.claims().size(),
+                    "TPS at start (server snapshot): "+Arrays.toString(Bukkit.getTPS()),"Average tick ms at start (server snapshot): "+Bukkit.getAverageTickTime());
+            String filename="claims-test-"+DateTimeFormatter.ofPattern("uuuuMMdd-HHmmss").withZone(ZoneOffset.UTC).format(Instant.now())+"-"+UUID.randomUUID().toString().substring(0,8)+".log";
+            Path directory=getDataFolder().toPath().resolve("test-reports"),report=directory.resolve(filename);
+            messages().send(sender,"commands.test-started");
+            benchmarkWorker.execute(()->{
+                long started=System.nanoTime(),heapBefore=runtime.totalMemory()-runtime.freeMemory(); boolean success=false;
+                try {
+                    Files.createDirectories(directory);
+                    try(BufferedWriter writer=Files.newBufferedWriter(report,StandardCharsets.UTF_8,StandardOpenOption.CREATE_NEW,StandardOpenOption.WRITE)) {
+                        java.util.function.Consumer<String> line=text->{
+                            try { writer.write(text); writer.newLine(); writer.flush(); }
+                            catch(IOException e) { throw new UncheckedIOException(e); }
+                        };
+                        environment.forEach(line);
+                        line.accept("Heap used at start bytes (whole JVM, no forced GC): "+heapBefore);
+                        try {
+                            ClaimBenchmark.run(directory,ClaimBenchmark.Options.standard(),line);
+                            line.accept("RESULT: PASS");
+                        } catch(Exception e) {
+                            line.accept("RESULT: FAILED / "+e.getClass().getSimpleName()+": "+e.getMessage()); throw e;
+                        } finally {
+                            line.accept("Elapsed seconds: "+(System.nanoTime()-started)/1000000000.0);
+                            line.accept("Heap used at end bytes (whole JVM; not retained plugin memory): "+(runtime.totalMemory()-runtime.freeMemory()));
+                            line.accept("Interpretation: repeat runs on the same hardware and JVM with similar server activity. First runs include JVM/JIT warmup noise.");
+                            line.accept("This test does not simulate real players, Paper event dispatch, particle rendering or Bedrock interaction. TPS/tick values above are start snapshots, not measured test impact.");
+                        }
+                    }
+                    success=true;
+                } catch(Exception e) { getLogger().log(Level.WARNING,"Claim test failed; report: "+report,e); }
+                finally { testing.set(false); }
+                boolean passed=success,hasReport=Files.isRegularFile(report);
+                if(!closing) Bukkit.getScheduler().runTask(this,()->{
+                    messages().send(sender,passed?"success.test":hasReport?"errors.test-failed":"errors.test-report","file","test-reports/"+filename);
+                    getLogger().info("Claim test "+(passed?"passed":"failed")+"; report: "+report);
+                });
+            });
+        } catch(RuntimeException e) { testing.set(false); throw e; }
     }
     private void applyConfiguration() {
         configuration.update(candidate->candidate.settings().validateLiveTools(),candidate->{ if(selections!=null) selections.clear(); });

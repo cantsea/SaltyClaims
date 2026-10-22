@@ -39,7 +39,8 @@ public final class ConfigFiles {
                 new MigrationStep(8,"Simplify stock messages; preserve custom wording and historical placeholders",MessageMigrationV8::apply),
                 new MigrationStep(9,"Remove obsolete explain command message; preserve remaining templates",document->{}),
                 new MigrationStep(10,"Move tool guidance into claim help; preserve customized messages",MessageMigrationV10::apply),
-                new MigrationStep(11,"Add immediate unclaim command messages; preserve existing templates",document->{})
+                new MigrationStep(11,"Add immediate unclaim command messages; preserve existing templates",document->{}),
+                new MigrationStep(12,"Add isolated claim benchmark messages; preserve existing templates",document->{})
         ),Set.of(),Messages::from);
     }
     public static ConfigurationPipeline<RuntimeConfiguration> pipeline(Path directory,Consumer<String> logger) {
