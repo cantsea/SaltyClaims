@@ -35,13 +35,11 @@ commands:
     Claim flags can disable these actions. You cannot trust or untrust yourself.
   reloaded: 'Settings reloaded.'
   bypass: 'Claim bypass: {enabled}.'
-  cancelled: 'Selection cancelled.'
   list-entry: |-
     {type} in {world}: {size} ({area} blocks)
       {corner1} to {corner2}
   no-claims: 'You have no claims.'
   allowance: 'Claim blocks: {used} used out of {total}.'
-  inherit-trust: 'Use the main claim''s trust: {enabled}.'
   flag-entry: '{flag}: {value}'
   trust-list: ''
   trust-level: '  {level}: {players}'
@@ -53,7 +51,6 @@ commands:
   bounds: 'Size: {size} ({area} blocks)'
   your-trust: 'Your access: {trust}'
   local-flags: ''
-  root-flags: ''
   confirm-delete: 'Type /{command} delete confirm to delete this {type}.'
   balance: '{player}: {used} blocks used, {starting} starting, {earned} earned, {bonus} bonus.'
 selection:
@@ -73,7 +70,6 @@ success:
   created: '{type} created.'
   resized: 'Claim resized.'
   deleted: 'Claim deleted.'
-  restricted: 'Main claim trust: {enabled}.'
   flag: '{flag} set to {value}.'
   trust: 'Trust updated. Use /claim trustlist to see who has access.'
   balance: '{player} now has {bonus} bonus claim blocks.'
@@ -102,7 +98,6 @@ labels:
   none: 'none'
   public: 'Everyone'
   local: 'Trust in this claim'
-  inherited: 'Trust from the main claim'
   unknown-player: 'Unknown player'
   unloaded-world: 'unloaded world'
   full-height: 'full height'
@@ -128,11 +123,8 @@ errors:
   no-owner-claims: 'That player has no claims.'
   owner-only: 'Only the claim owner can do that.'
   manage-required: 'You need Manage trust to do that.'
-  admin-target: 'Enter the claim owner''s name.'
   unknown-command: 'Unknown command. Use /{command} help.'
   maintenance: 'Claims are temporarily unavailable. Please try again later.'
-  root-required: 'Choose a main claim. Child claims cannot contain more claims.'
-  child-required: 'Stand inside a child claim first.'
   action-failed: 'Something went wrong. Please contact an administrator.'
   no-claim: 'Stand inside a claim first.'
   world-unloaded: 'That world is not loaded.'
@@ -184,4 +176,4 @@ errors:
   invalid-input: '{reason}'
 
 # Independent message-file schema version. Managed automatically; do not edit.
-config-version: 16
+config-version: 17

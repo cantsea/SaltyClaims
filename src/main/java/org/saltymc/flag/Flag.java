@@ -18,7 +18,6 @@ public enum Flag {
     Flag(String value) { this(value, true); }
     Flag(String value, boolean actor) { this.defaultValue = value; this.actor = actor; }
     public String key() { return name().toLowerCase(Locale.ROOT).replace('_', '-'); }
-    public String defaultValue() { return defaultValue; }
     /** Boolean switches keep trust thresholds fixed; legacy values remain readable from SQLite. */
     public boolean enabled(String value) { return !value.equals("deny") && !value.equals("false"); }
     public String behavior(boolean enabled,boolean wilderness) {

@@ -60,7 +60,8 @@ public final class ConfigFiles {
                 }),
                 new MigrationStep(14,"Add trust-level help and self-trust rejection; preserve existing templates",document->{}),
                 new MigrationStep(15,"Add personal claim-block balance message; preserve existing templates",document->{}),
-                new MigrationStep(16,"Add server-managed mode guidance and denials; preserve existing templates",document->{})
+                new MigrationStep(16,"Add server-managed mode guidance and denials; preserve existing templates",document->{}),
+                new MigrationStep(17,"Prune unused cancellation, inheritance and legacy targeting messages",document->{})
         ),Set.of(),Messages::from);
     }
     public static ConfigurationPipeline<RuntimeConfiguration> pipeline(Path directory,Consumer<String> logger) {
