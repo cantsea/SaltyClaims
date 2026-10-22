@@ -11,15 +11,20 @@ class SettingsTest {
     private Settings load(String yaml) throws Exception {
         Path path=directory.resolve("config.yml"); Files.writeString(path,yaml); return Settings.load(path.toFile());
     }
-    @Test void defaultsAndTypedWorldPolicies() throws Exception {
-        Settings settings=load("flags:\n  enforced:\n    pvp: deny\nworlds:\n  world:\n    container-use: public\n");
-        assertEquals(10000,settings.limits().starting()); assertEquals("deny",settings.enforced().get(Flag.PVP));
-        assertEquals("public",settings.worlds().get("world").get(Flag.CONTAINER_USE));
+    @Test void booleanClaimDefaultsAndEditability() throws Exception {
+        Settings settings=load("claim-flags:\n  pvp:\n    default: true\n    player-editable: true\n");
+        assertEquals(10000,settings.limits().starting());
+        assertTrue(settings.claimFlag(Flag.PVP).defaultValue());
+        assertTrue(settings.claimFlag(Flag.PVP).playerEditable());
+        assertTrue(settings.claimFlag(Flag.BLOCK_BREAK).defaultValue());
+        assertFalse(settings.claimFlag(Flag.BLOCK_BREAK).playerEditable());
     }
     @Test void malformedAndUnknownPoliciesAreRejected() {
-        assertThrows(IllegalArgumentException.class,()->load("flags:\n  defaults:\n    imaginary-flag: allow\n"));
-        assertThrows(IllegalArgumentException.class,()->load("flags:\n  defaults:\n    pvp: build\n"));
-        assertThrows(IllegalArgumentException.class,()->load("flags:\n  defaults: deny\n"));
+        for(String yaml:new String[]{"claim-flags:\n  imaginary-flag: {default: false, player-editable: false}\n",
+                "claim-flags:\n  pvp: {default: allow}\n","claim-flags: deny\n",
+                "claim-flags:\n  pvp: {default: false, player-editable: 'true'}\n",
+                "claim-flags: null\n", "claim-flags:\n  pvp: null\n", "claim-flags:\n  pvp: {default: null}\n"})
+            assertThrows(IllegalArgumentException.class,()->load(yaml));
     }
     @Test void invalidLimitsAndTypesAreRejected() {
         assertThrows(IllegalArgumentException.class,()->load("claims:\n  starting-blocks: -1\n"));
@@ -50,8 +55,9 @@ class SettingsTest {
     @Test void upgradedConfigIncludesEveryFlagAndTrustReferenceWithoutChangingSettings() {
         var candidate=ConfigFiles.settingsFile().prepare("claims:\n  starting-blocks: 12345\nconfig-version: 4\n".getBytes(java.nio.charset.StandardCharsets.UTF_8));
         String yaml=new String(candidate.output(),java.nio.charset.StandardCharsets.UTF_8);
-        for(Flag flag:Flag.values()) assertTrue(yaml.contains("#   "+flag.key()+" ["),flag.key());
-        for(String level:new String[]{"visitor","access","container","build","manage","owner"}) assertTrue(yaml.contains("#   "+level+":"),level);
+        for(Flag flag:Flag.values()) assertTrue(yaml.contains("  "+flag.key()+":"),flag.key());
+        assertTrue(yaml.contains("player-editable: false"));
+        assertTrue(yaml.contains("Requires Container trust"));
         assertEquals(12345,Settings.from(candidate.document()).limits().starting());
     }
     @Test void borderColorsAdoptDefaultsAndPreserveConfiguredHexValues() throws Exception {

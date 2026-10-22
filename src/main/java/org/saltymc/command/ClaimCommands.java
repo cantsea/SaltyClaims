@@ -22,12 +22,13 @@ import java.util.*;
 /** All executable paths are independently permission-gated; roots have no blanket gate. */
 public final class ClaimCommands implements CommandExecutor, TabCompleter, Listener {
     public static final List<String> PLAYER_PATHS = List.of("help", "resize", "cancel", "info", "list",
-            "trust", "untrust", "trustlist", "flags", "flag", "child.create", "child.restrict");
-    public static final List<String> ADMIN_PATHS = List.of("help", "inspect", "bypass", "delete", "resize", "trust", "untrust", "trustlist", "flag", "flags",
+            "trust", "untrust", "trustlist", "child.create", "child.restrict");
+    public static final List<String> ADMIN_PATHS = List.of("help", "inspect", "bypass", "delete", "resize", "trust", "untrust", "trustlist",
             "balance.show", "balance.set", "balance.add", "balance.remove", "reload", "backup", "test", "delete.confirm", "reset.all", "reset.all.confirm");
     private final SaltyClaims plugin;
+    private final ClaimFlagCommands flagCommands;
     private final DeleteConfirmations confirmations=new DeleteConfirmations();
-    public ClaimCommands(SaltyClaims plugin) { this.plugin = plugin; }
+    public ClaimCommands(SaltyClaims plugin) { this.plugin = plugin; this.flagCommands=new ClaimFlagCommands(plugin); }
     private Messages messages() { return plugin==null?Messages.defaults():plugin.messages(); }
     private String onOff(boolean value) { return messages().text(value?"labels.enabled":"labels.disabled"); }
     private String trustLabel(Trust value) { return messages().text("labels.trust-"+value.key()); }
@@ -44,6 +45,8 @@ public final class ClaimCommands implements CommandExecutor, TabCompleter, Liste
         register(permission(false,"create"),PermissionDefault.TRUE);
         register(unclaimPermission(false),PermissionDefault.TRUE);
         register(unclaimPermission(true),PermissionDefault.TRUE);
+        register(ClaimFlagCommands.LIST,PermissionDefault.TRUE);
+        register(ClaimFlagCommands.TOGGLE,PermissionDefault.TRUE);
         for (Flag flag : Flag.values()) register("saltyclaims.flag." + flag.key(),PermissionDefault.TRUE);
         register("saltyclaims.admin.recovery",PermissionDefault.OP);
     }
@@ -78,6 +81,7 @@ public final class ClaimCommands implements CommandExecutor, TabCompleter, Liste
         if (!admin && !plugin.state().trust(c,player(sender).getUniqueId()).grants(Trust.MANAGE)) throw new MessageException("errors.manage-required");
     }
     @Override public boolean onCommand(CommandSender sender, Command command, String label, String[] raw) {
+        if(Set.of("claimflag","claimflags").contains(command.getName().toLowerCase(Locale.ROOT))) return flagCommands.onCommand(sender,command,label,raw);
         boolean admin = command.getName().equalsIgnoreCase("claima");
         boolean selectionAction=false;
         try {
@@ -114,6 +118,10 @@ public final class ClaimCommands implements CommandExecutor, TabCompleter, Liste
                 for (String route : admin?ADMIN_PATHS:PLAYER_PATHS) if (sender.hasPermission(permission(admin,route))) messages().send(sender,"commands.help-line","usage",usage(admin,route));
                 if(!admin) for(boolean all:List.of(false,true)) if(sender.hasPermission(unclaimPermission(all)))
                     messages().send(sender,"commands.help-line","usage",all?"/unclaim all":"/unclaim");
+                if(!admin) {
+                    if(sender.hasPermission(ClaimFlagCommands.LIST)) messages().send(sender,"commands.help-line","usage","/claimflags");
+                    if(sender.hasPermission(ClaimFlagCommands.TOGGLE)) messages().send(sender,"commands.help-line","usage","/claimflag toggle [flag]");
+                }
                 if(admin) messages().send(sender,"commands.help-admin"); return true;
             }
             if (path.equals("reload")) { plugin.reloadSettings(); messages().send(sender,"commands.reloaded"); return true; }
@@ -172,21 +180,6 @@ public final class ClaimCommands implements CommandExecutor, TabCompleter, Liste
                 boolean restricted=toggle(arg(a,2,"/claim child restrict <on|off>"));
                 plugin.mutate(sender,s->ClaimService.replace(s,claim.change(claim.bounds(),!restricted,claim.trust(),claim.flags())),Notice.of("success.restricted","enabled",onOff(!restricted),"id",claim.id())); return true;
             }
-            if (path.equals("flags")) {
-                manager(sender,claim,admin); World world=world(claim);
-                for(Flag f:Flag.values()) messages().send(sender,"commands.flag-entry","flag",f.key(),"value",plugin.value(claim,f,world).value(),"source",plugin.value(claim,f,world).source());
-                return true;
-            }
-            if (path.equals("flag")) {
-                owner(sender,plugin.state(),claim,admin); int offset=admin?2:1;
-                Flag flag=Flag.parse(arg(a,offset,"/"+label+" flag "+(admin?"<owner> ":"")+"<flag> <value|reset>"));
-                if(!admin) require(sender,"saltyclaims.flag."+flag.key());
-                if(plugin.settings().enforced().containsKey(flag)) throw new MessageException("errors.flag-enforced");
-                String value=arg(a,offset+1,"Provide a value or reset.").toLowerCase(Locale.ROOT);
-                Map<Flag,String> overrides=new EnumMap<>(Flag.class); overrides.putAll(claim.flags());
-                if(value.equals("reset")) overrides.remove(flag); else overrides.put(flag,flag.validate(value));
-                plugin.mutate(sender,s->ClaimService.replace(s,claim.change(claim.bounds(),claim.inheritTrust(),claim.trust(),overrides)),Notice.of("success.flag","flag",flag.key(),"value",value,"id",claim.id())); return true;
-            }
         } catch (IllegalArgumentException|ArithmeticException e) { if(selectionAction) clearFailedSelection(sender); messages().sendError(sender,e); }
         catch (Exception e) { if(selectionAction) clearFailedSelection(sender); plugin.getLogger().log(java.util.logging.Level.SEVERE,"Command failure",e); messages().send(sender,"errors.action-failed"); }
         return true;
@@ -219,9 +212,8 @@ public final class ClaimCommands implements CommandExecutor, TabCompleter, Liste
         return base+switch(path) {
             case "trust" -> (admin?" <owner>":"")+" <player|public> [access|container|build|manage]";
             case "untrust" -> (admin?" <owner>":"")+" <player|public|all>";
-            case "flag" -> (admin?" <owner>":"")+" <key> <value|reset>";
             case "info" -> " [owner]";
-            case "inspect","delete","flags","trustlist" -> admin?" <owner>":"";
+            case "inspect","delete","trustlist" -> admin?" <owner>":"";
             case "resize" -> admin?" <owner> [minX minZ maxX maxZ [minY maxY]]":"";
             case "bypass","child.restrict" -> " <on|off>";
             case "balance.show" -> " <player>";
@@ -250,7 +242,6 @@ public final class ClaimCommands implements CommandExecutor, TabCompleter, Liste
     }
     private World world(Claim c) { World w=Bukkit.getWorld(c.world()); if(w==null) throw new MessageException("errors.world-unloaded"); return w; }
     private void validateWorld(World world, Bounds bounds) {
-        if(plugin.settings().disabledWorlds().contains(world.getName())) throw new MessageException("errors.world-disabled");
         if(!bounds.fullHeight()&&(bounds.minY()<world.getMinHeight()||bounds.maxY()>=world.getMaxHeight())) throw new MessageException("errors.world-height");
         for(int x:new int[]{bounds.minX(),bounds.maxX()}) for(int z:new int[]{bounds.minZ(),bounds.maxZ()})
             if(!world.getWorldBorder().isInside(new Location(world,x+0.5,world.getMinHeight(),z+0.5))) throw new MessageException("errors.world-border");
@@ -259,6 +250,7 @@ public final class ClaimCommands implements CommandExecutor, TabCompleter, Liste
         Session selection=plugin.selections().session(p);
         if(child==selection.mode.equals("basic")) throw new MessageException("errors.selection-mode");
         Bounds bounds=plugin.selections().bounds(p); World world=selection.first.getWorld(); validateWorld(world,bounds);
+        if(!plugin.settings().world(world.getName()).claiming()) throw new MessageException("errors.world-disabled");
         UUID parent=null;
         if(child) {
             if(selection.parent==null) throw new MessageException("errors.select-root");
@@ -353,6 +345,7 @@ public final class ClaimCommands implements CommandExecutor, TabCompleter, Liste
         plugin.mutate(sender,s->{ Map<UUID,ClaimState.Account> accounts=new HashMap<>(s.accounts()); accounts.put(target,account); return new ClaimState(s.claims(),accounts); },Notice.of("success.balance","player",target,"bonus",bonus));
     }
     @Override public List<String> onTabComplete(CommandSender sender,Command command,String label,String[] args) {
+        if(Set.of("claimflag","claimflags").contains(command.getName().toLowerCase(Locale.ROOT))) return flagCommands.onTabComplete(sender,command,label,args);
         if(command.getName().equalsIgnoreCase("unclaim"))
             return args.length==1&&sender.hasPermission(unclaimPermission(true))&&"all".startsWith(args[0].toLowerCase(Locale.ROOT))?List.of("all"):List.of();
         boolean admin=command.getName().equalsIgnoreCase("claima"); List<String> paths=admin?ADMIN_PATHS:PLAYER_PATHS;
@@ -362,16 +355,11 @@ public final class ClaimCommands implements CommandExecutor, TabCompleter, Liste
         for(String path:paths) if(sender.hasPermission(permission(admin,path))&&path.startsWith(head)) {
             String remainder=path.substring(head.length()); options.add(remainder.split("\\.")[0]);
         }
-        if(args.length>1&&args[0].equals("flag")&&sender.hasPermission(permission(admin,args[0]))) {
-            int flagIndex=admin?2:1;
-            if(args.length-1==flagIndex) for(Flag f:Flag.values()) options.add(f.key());
-            if(args.length-1==flagIndex+1) try { options.addAll(Flag.parse(args[flagIndex]).valuesAllowed()); options.add("reset"); } catch(IllegalArgumentException ignored) { }
-        }
         if(!admin&&args.length==3&&args[0].equals("trust")&&sender.hasPermission(permission(false,"trust"))) options.addAll(List.of("access","container","build","manage"));
         if(plugin!=null&&args.length>1) {
             String action=args[0].toLowerCase(Locale.ROOT);
             boolean allowed=sender.hasPermission(permission(admin,action));
-            boolean ownerArgument=args.length==2&&(admin&&Set.of("inspect","resize","delete","trust","untrust","trustlist","flag","flags").contains(action)||!admin&&action.equals("info"));
+            boolean ownerArgument=args.length==2&&(admin&&Set.of("inspect","resize","delete","trust","untrust","trustlist").contains(action)||!admin&&action.equals("info"));
             boolean trustArgument=Set.of("trust","untrust").contains(action)&&args.length==(admin?3:2);
             if(allowed&&(ownerArgument||trustArgument||args[args.length-2].equals("--owner"))) {
                 Bukkit.getOnlinePlayers().forEach(player->options.add(player.getName()));

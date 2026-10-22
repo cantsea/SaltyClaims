@@ -17,62 +17,112 @@ particle-duration-seconds: 10
 border-colors:
   parent: '#FFFF00'
   child: '#00FFFF'
-disabled-worlds: []
-# Missing flags use built-in claim defaults; wilderness is permissive.
-# Values here also apply to wilderness. Owner overrides cannot defeat enforced values.
-# Trust levels are cumulative under the built-in flag defaults:
-#   visitor: no grant; may enter/walk through claims, with no protected interactions.
-#   access: doors, trapdoors, gates, buttons/levers/pressure plates, beds, riding vehicles.
-#   container: Access plus inventories, workstations, harvesting/replanting crops,
-#              animal interaction, shearing and leashing.
-#   build: Container plus breaking/placing blocks, buckets, damaging animals,
-#          editing decorations/vehicles, and player ignition.
-#   manage: Build plus granting/revoking Access, Container and Build in its scope.
-#           Managers cannot grant/remove peer Manage grants or change geometry/flags.
-#   owner: all trust capabilities; can assign Manage, resize/delete and edit flags.
-# Public grants apply to everyone; Public cannot receive Manage.
-# Flags may raise/lower these access requirements. Actor deny also blocks owners.
-# Each command still needs its own permission. Server-enforced flags always win.
-# Normal trust commands edit the child at your location, otherwise its parent.
-# Children inherit parent grants unless restricted; the highest applicable grant wins.
-#
-# Complete flag reference (built-in claim default in brackets):
-# Actor flags accept public, access, container, build, manage, owner, or deny.
-#   block-break [build]: break ordinary blocks; mature crops use crop-harvest.
-#   block-place [build]: place blocks and perform block transformations/sign edits;
-#                        planting supported crops uses crop-replant.
-#   container-use [container]: open/use inventories, including double chests and lecterns.
-#   door-use [access]: open doors, trapdoors and gates.
-#   switch-use [access]: use buttons, levers, pressure plates and analog switches.
-#   bed-use [access]: interact with beds.
-#   utility-use [container]: use crafting tables, anvils, enchanting and other workstations.
-#   crop-harvest [container]: harvest mature supported crops/berries and trample farmland.
-#   crop-replant [container]: plant supported crops/seeds.
-#   bucket-use [build]: fill/empty buckets and player-caused cauldron changes.
-#   animal-interact [container]: interact with, shear, leash or unleash animals/entities.
-#   animal-damage [build]: player-attributed damage to protected non-player entities.
-#   decoration-edit [build]: place, manipulate or damage hanging decorations/armor stands.
-#   vehicle-edit [build]: place, edit or damage vehicles.
-#   vehicle-use [access]: ride/mount vehicles.
-#   ignite [build]: player ignition and player-triggered TNT priming.
-# Environment/boundary flags accept allow or deny:
-#   pvp [deny]: player-versus-player damage, including attributed indirect attacks.
-#   explosion-block-damage [deny]: explosion damage to blocks and non-player TNT priming.
-#   explosion-entity-damage [deny]: explosion damage to entities/decorations.
-#   fire-spread [deny]: non-player ignition, fire spreading and burning blocks.
-#   mob-block-grief [deny]: non-player block changes and cross-region non-fire spreading.
-#   fluid-crossing [deny]: fluid/sponge transfers across claim boundaries.
-#   piston-crossing [deny]: piston movement across claim boundaries.
-#   hopper-crossing [deny]: item transfers/pickups across claim boundaries.
-# Crossing includes parent/child and sibling boundaries; both sides must allow it.
-# Other applicable block/container flags can also block automated boundary transfers.
-# Child flags inherit from the parent even when child trust inheritance is disabled.
-# Precedence: enforced > child override > parent override > world > global > built-in.
-flags:
-  defaults: {}
-  enforced: {}
-# World names map directly to flag defaults, e.g. world: {pvp: deny}
-worlds: {}
+# Claim behavior switches: false denies the behavior, including for the owner.
+# true permits it, subject to the normal trust requirement listed below.
+# Visitors have no trust; Access < Container < Build < Manage < Owner.
+# Manage can delegate lower trust and create children; only owners edit flags.
+# New children keep only the parent owner and their creating manager's trust.
+# Child flags inherit parent overrides, independently of trust inheritance.
+# player-editable: false locks this flag to its configured default in every claim.
+# player-editable: true lets owners with the flag permission toggle it locally.
+# Wilderness rules and world claiming switches are exclusively in worlds.yml.
+claim-flags:
+  # Requires Build trust or higher when enabled.
+  block-break:
+    default: true
+    player-editable: false
+  # Requires Build trust or higher when enabled.
+  block-place:
+    default: true
+    player-editable: false
+  # Requires Container trust or higher when enabled.
+  container-use:
+    default: true
+    player-editable: false
+  # Requires Access trust or higher when enabled.
+  door-use:
+    default: true
+    player-editable: false
+  # Requires Access trust or higher when enabled.
+  switch-use:
+    default: true
+    player-editable: false
+  # Requires Access trust or higher when enabled.
+  bed-use:
+    default: true
+    player-editable: false
+  # Requires Container trust or higher when enabled.
+  utility-use:
+    default: true
+    player-editable: false
+  # Requires Container trust or higher when enabled.
+  crop-harvest:
+    default: true
+    player-editable: false
+  # Requires Container trust or higher when enabled.
+  crop-replant:
+    default: true
+    player-editable: false
+  # Requires Build trust or higher when enabled.
+  bucket-use:
+    default: true
+    player-editable: false
+  # Requires Container trust or higher when enabled.
+  animal-interact:
+    default: true
+    player-editable: false
+  # Requires Build trust or higher when enabled.
+  animal-damage:
+    default: true
+    player-editable: false
+  # Requires Build trust or higher when enabled.
+  decoration-edit:
+    default: true
+    player-editable: false
+  # Requires Build trust or higher when enabled.
+  vehicle-edit:
+    default: true
+    player-editable: false
+  # Requires Access trust or higher when enabled.
+  vehicle-use:
+    default: true
+    player-editable: false
+  # Requires Build trust or higher when enabled.
+  ignite:
+    default: true
+    player-editable: false
+  # Environment/boundary behavior; independent of player trust.
+  pvp:
+    default: false
+    player-editable: false
+  # Environment/boundary behavior; independent of player trust.
+  explosion-block-damage:
+    default: false
+    player-editable: false
+  # Environment/boundary behavior; independent of player trust.
+  explosion-entity-damage:
+    default: false
+    player-editable: false
+  # Environment/boundary behavior; independent of player trust.
+  fire-spread:
+    default: false
+    player-editable: false
+  # Environment/boundary behavior; independent of player trust.
+  mob-block-grief:
+    default: false
+    player-editable: false
+  # Environment/boundary behavior; independent of player trust.
+  fluid-crossing:
+    default: false
+    player-editable: false
+  # Environment/boundary behavior; independent of player trust.
+  piston-crossing:
+    default: false
+    player-editable: false
+  # Environment/boundary behavior; independent of player trust.
+  hopper-crossing:
+    default: false
+    player-editable: false
 
 # Independent configuration schema version. Managed automatically; do not edit.
-config-version: 6
+config-version: 7

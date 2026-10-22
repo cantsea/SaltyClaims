@@ -54,10 +54,8 @@ Right-clicking claimed land with the regular claim tool shows its border and `Th
 # Right-click two corners: same Y creates a full-height child; different Y creates a 3D child.
 /claim child restrict on
 
-/claim flags
-/claim flag pvp allow
-/claim flag container-use public
-/claim flag container-use reset
+/claimflags
+/claimflag toggle pvp
 ```
 
 Commands act on the child at your location, otherwise the root. Use `--root`, `--owner <player>`, or `--at <world> <x> <y> <z>` for explicit targeting. An owner name selects their sole root remotely; multiple claims require a location. Commands and messages use player names and claim locations. Children cannot contain children. Owners and parent managers can create children. New children disable parent trust inheritance: the parent owner retains ownership, and a manager who creates the child receives a local Manage grant. Other parent members and public grants have no access. Existing children keep their saved inheritance setting. `/claim child restrict off` enables parent trust inheritance; flags continue to inherit independently. Managers can delegate lower trust, but resizing, ownership, flag edits, and manager assignment remain owner-only.
@@ -66,7 +64,25 @@ Commands act on the child at your location, otherwise the root. Use `--root`, `-
 
 Regular claims use `tools.selection: STICK`; child claims use `tools.child-selection: BONE`; inspection uses `tools.inspection: FEATHER`. All three items must be distinct. The child tool chooses its parent from the first clicked block. Switching away from a claim tool clears its selection and particle preview immediately, including resize state. Returning to the tool starts fresh. `/claim mode basic` and `/claim mode child` have been removed.
 
-`config.yml` includes a commented reference for every flag, its built-in default, and its effect, along with cumulative trust levels and their default access. Flags may change the access required for each action.
+Every flag is listed in config.yml under claim-flags, with a boolean default and player-editable switch. False denies the behavior, even for the owner; true permits it subject to the normal Access/Container/Build trust requirement. Action flags default to true, environmental flags to false, and every player-editable setting defaults to false. A locked flag always uses the server default, ignoring saved claim overrides. For editable flags, a child override wins over a parent override, then the configured default applies.
+
+Use /claimflags while standing in an owned claim to list flags you can edit, and /claimflag toggle [flag] to flip one. Listing and completion show only editable flags for which you have permission. Wilderness, another player's claim, and trusted claims do not grant flag-edit authority. The new commands have independent saltyclaims.command.claimflags and saltyclaims.command.claimflag.toggle permissions, plus saltyclaims.flag.<key> for each flag. Old /claim flag(s) and /claima flag(s) routes are removed.
+
+### World wilderness settings
+
+worlds.yml contains each loaded world by its literal name. Worlds are added at startup, world load and /claima reload with claiming: false and every wilderness flag true. False denies the behavior; true allows it. Claiming controls new claim creation, independently of wilderness protection; existing claims stay protected. World wilderness rules never apply inside claims. There is no enforced section.
+
+```yaml
+world:
+  claiming: false
+  wilderness-flags:
+    block-break: true
+    block-place: true
+    pvp: true
+    # The generated file includes every supported flag.
+```
+
+On upgrade, legacy explicit global/world rules are converted to boolean wilderness switches. Existing claiming availability is preserved for known worlds. Legacy enforced claim values become locked defaults; custom action thresholds become enabled/disabled switches with fixed trust requirements. Exact original files are backed up before migration. Review the resulting config.yml and worlds.yml before reopening the server.
 
 Use `/unclaim` to remove the child claim you are standing in, or the main claim when there is no child. Removing a main claim also removes its children. `/unclaim all` removes every claim you own across all worlds. Both apply immediately without confirmation, preserve your earned/bonus claim blocks, and release the used area. Permissions are `saltyclaims.command.unclaim` and `saltyclaims.command.unclaim.all` (both default true). The old player `/claim delete` commands are removed.
 
@@ -86,7 +102,7 @@ Use `/unclaim` to remove the child claim you are standing in, or the main claim 
 /claima reload
 ```
 
-Each executable player/admin subcommand has its own permission; there is no shared root permission. Player nodes default to true and admin nodes to op. For example, `saltyclaims.command.claim.create` and `saltyclaims.command.claima.delete` are independent. Flag editing also checks `saltyclaims.flag.<key>`. Administrative bypass is off on each connection and does not override enforced server flags or grant administrative command permissions.
+Each executable player/admin subcommand has its own permission; there is no shared root permission. Player nodes default to true and admin nodes to op. For example, `saltyclaims.command.claim.create` and `saltyclaims.command.claima.delete` are independent. Flag editing also checks `saltyclaims.flag.<key>`. Administrative bypass is off on each connection. It bypasses player gameplay checks but does not grant command permissions or flag-edit authority.
 
 `/claima reset all` requests deletion of every claim on this server. Confirm within 30 seconds using `/claima reset all confirm`. These require `saltyclaims.command.claima.reset.all` and `saltyclaims.command.claima.reset.all.confirm` respectively; confirmation also rechecks the request permission. Reset removes all parents, children, local trust, and local flags, clears selection previews after saving, and releases all used area. Earned/bonus balances, configuration, and backups remain. Any claim change invalidates the pending reset.
 

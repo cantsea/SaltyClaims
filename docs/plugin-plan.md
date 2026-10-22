@@ -120,11 +120,11 @@ These are proposed defaults. Explosion entity damage, hostile mobs, vehicle ridi
 
 ### Precedence and authority
 
-For each flag: server-enforced value -> child override -> root override -> world default -> global default. A server-enforced value wins everywhere and cannot be overridden by owners. Missing child flags inherit root values even when child trust is restricted.
+Current flag resolution: locked claim default; otherwise child override -> root override -> claim default. Wilderness uses independent per-world booleans from worlds.yml, including when claiming is disabled. Missing child flags inherit root values even when child trust is restricted. All player flag edits use boolean toggles; trust thresholds are fixed.
 
 Editing requires both claim ownership/staff authority and the flag's permission node. Manage trust alone cannot edit flags. Metadata management is independent of action flags, so an owner can fix a `deny` flag without being locked out of the command.
 
-Server-enforced policies remain in force during ordinary staff protection bypass. Keep administrative policy editing separate from bypassing gameplay trust.
+Server claim defaults can be locked against player editing. Gameplay bypass does not grant flag-editing authority.
 
 ### Cross-boundary actions
 

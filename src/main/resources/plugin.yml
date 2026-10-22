@@ -17,3 +17,9 @@ commands:
   unclaim:
     description: Remove your current claim or all of your claims.
     usage: /unclaim [all]
+  claimflag:
+    description: Toggle an editable flag in your claim.
+    usage: /claimflag toggle [flag]
+  claimflags:
+    description: List the claim flags you can edit here.
+    usage: /claimflags

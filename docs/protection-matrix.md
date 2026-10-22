@@ -32,7 +32,7 @@ The handlers below are implemented in `ProtectionListener`. Domain/storage/comma
 
 Root/child identities are distinct boundaries, including stacked children. Crossing piston/fluid/hopper behavior is denied by default between regions; wilderness permits it unless configured otherwise. Same-region automation works without inheriting a player's trust. Permission to cross a boundary does not imply permission to access another container or modify blocks.
 
-Environmental flags do not receive an owner exemption. Staff gameplay bypass applies only to actor checks on non-enforced policy; environment/multi-location checks remain conservative. Other plugins' cancellations are never explicitly reversed.
+Environmental flags do not receive an owner exemption. Staff gameplay bypass applies only to player checks; environment/multi-location checks remain conservative. Other plugins' cancellations are never explicitly reversed.
 
 Unclassified right-click block interactions require block-place authority. This intentionally restricts some uncommon utility interactions until they receive a dedicated classification.
 
@@ -46,4 +46,4 @@ Unclassified right-click block interactions require block-place authority. This 
 - Startup maintenance with a failed database and runtime write failure; disconnect/reconnect during confirmations and bypass.
 - Interoperation with plugins that cancel the same events. Administrative world-edit tools can bypass Bukkit gameplay events and are outside this protection contract.
 
-Natural mob spawning, player entry bans, general item pickup/drop restrictions, and a redstone signal isolation system are not implemented. World defaults and enforced values can restrict wilderness too; configure them deliberately.
+Natural mob spawning, player entry bans, general item pickup/drop restrictions, and a redstone signal isolation system are not implemented. World-specific wilderness booleans in worlds.yml apply even if claiming is disabled. False denies behavior; true allows it. Claim rules are separate and there is no enforced layer.

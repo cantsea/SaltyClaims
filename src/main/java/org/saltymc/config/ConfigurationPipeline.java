@@ -17,10 +17,15 @@ public final class ConfigurationPipeline<T> {
     private final Consumer<String> log;
     private final AtomicBoolean updating=new AtomicBoolean();
     private volatile T current;
+    private final Consumer<Map<String,Map<String,Object>>> upgrade;
     public ConfigurationPipeline(Path directory,List<YamlFileSpec> specifications,Factory<T> factory,SafeConfigFiles files,Consumer<String> log) {
+        this(directory,specifications,factory,files,log,documents->{});
+    }
+    public ConfigurationPipeline(Path directory,List<YamlFileSpec> specifications,Factory<T> factory,SafeConfigFiles files,Consumer<String> log,
+                                 Consumer<Map<String,Map<String,Object>>> upgrade) {
         this.directory=directory.toAbsolutePath().normalize(); this.specifications=List.copyOf(specifications);
         if(specifications.stream().map(YamlFileSpec::name).distinct().count()!=specifications.size()) throw new IllegalArgumentException("Duplicate configuration filenames");
-        this.factory=factory; this.files=files; this.log=log;
+        this.factory=factory; this.files=files; this.log=log; this.upgrade=upgrade;
     }
     public T current() { return current; }
     public boolean updating() { return updating.get(); }
@@ -30,10 +35,19 @@ public final class ConfigurationPipeline<T> {
         String phase="preparation",filename="configuration bundle";
         try {
             List<Prepared> prepared=new ArrayList<>(); Map<String,Map<String,Object>> documents=new LinkedHashMap<>();
+            Map<String,SafeConfigFiles.Snapshot> originals=new LinkedHashMap<>();
+            for(YamlFileSpec spec:specifications) {
+                filename=spec.name(); SafeConfigFiles.Snapshot original=files.read(directory.resolve(filename));
+                originals.put(filename,original);
+                Map<String,Object> supplied=original.exists()?YamlData.parse(original.bytes(),filename):new LinkedHashMap<>();
+                if(YamlFileSpec.readVersion(supplied,filename)>spec.version()) throw ConfigException.at(filename,"config-version","is newer than supported version "+spec.version());
+                documents.put(filename,supplied);
+            }
+            upgrade.accept(documents);
             for(YamlFileSpec spec:specifications) {
                 filename=spec.name(); Path path=directory.resolve(filename);
-                SafeConfigFiles.Snapshot original=files.read(path);
-                YamlFileSpec.Candidate candidate=spec.prepare(original.bytes());
+                SafeConfigFiles.Snapshot original=originals.get(filename);
+                YamlFileSpec.Candidate candidate=spec.prepare(original.bytes(),documents.get(filename));
                 prepared.add(new Prepared(spec,path,original,candidate)); documents.put(filename,candidate.document());
             }
             filename="configuration bundle"; phase="validation";

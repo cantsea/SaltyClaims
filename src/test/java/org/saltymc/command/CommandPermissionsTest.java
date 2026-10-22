@@ -7,6 +7,16 @@ import java.util.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 class CommandPermissionsTest {
+    @Test void oldFlagRoutesAreRemovedFromBothCommandFamilies() {
+        ClaimCommands commands=new ClaimCommands(null);
+        for(boolean admin:List.of(false,true)) for(String route:List.of("flag","flags")) {
+            String name=admin?"claima":"claim"; List<String> messages=new ArrayList<>();
+            var sender=sender(Set.of(ClaimCommands.permission(admin,route)),messages);
+            commands.onCommand(sender,command(name),name,new String[]{route});
+            assertEquals(List.of("[SaltyClaims] Unknown command. Use /"+name+" help."),messages);
+            assertTrue(commands.onTabComplete(sender,command(name),name,new String[]{"fl"}).isEmpty());
+        }
+    }
     private Command command(String name) {
         return new Command(name) { @Override public boolean execute(CommandSender sender,String label,String[] arguments) { return false; } };
     }

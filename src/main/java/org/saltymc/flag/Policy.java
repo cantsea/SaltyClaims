@@ -2,30 +2,30 @@ package org.saltymc.flag;
 
 import org.saltymc.claim.*;
 import org.saltymc.trust.Trust;
+import org.saltymc.config.Settings;
+import org.saltymc.config.WorldSettings;
 import java.util.*;
 
-/** Pure resolver. Wilderness is permissive unless world/default/enforced policy explicitly says otherwise. */
+/** Claim switches and world wilderness switches are independent. Enabled claim actions still require trust. */
 public final class Policy {
-    public record Value(String value, String source, boolean enforced) { }
+    public record Value(String value, String source) {
+        public boolean enabled() { return !value.equals("deny"); }
+    }
     public record Decision(boolean allowed, String reason) { }
     private Policy() { }
     public static Value resolve(ClaimState state, Claim c, Flag flag, String world,
-                                Map<Flag, String> defaults, Map<Flag, String> enforced,
-                                Map<String, Map<Flag, String>> worlds) {
-        if (enforced.containsKey(flag)) return new Value(enforced.get(flag), "server-enforced", true);
-        if (c != null) {
-            if (c.flags().containsKey(flag)) return new Value(c.flags().get(flag), c.root() ? "root override" : "child override", false);
-            Claim root = state.root(c);
-            if (!c.root() && root.flags().containsKey(flag)) return new Value(root.flags().get(flag), "root override", false);
+                                Map<Flag, Settings.ClaimFlag> defaults, Map<String, WorldSettings> worlds) {
+        if(c==null) return new Value(flag.behavior(worlds.getOrDefault(world,WorldSettings.defaults()).allows(flag),true),"world wilderness");
+        Settings.ClaimFlag setting=defaults.getOrDefault(flag,new Settings.ClaimFlag(flag.actor(),false));
+        if(setting.playerEditable()) {
+            if(c.flags().containsKey(flag)) return new Value(flag.behavior(flag.enabled(c.flags().get(flag)),false),c.root()?"root override":"child override");
+            Claim root=state.root(c);
+            if(!c.root()&&root.flags().containsKey(flag)) return new Value(flag.behavior(flag.enabled(root.flags().get(flag)),false),"root override");
         }
-        Map<Flag, String> worldFlags = worlds.getOrDefault(world, Map.of());
-        if (worldFlags.containsKey(flag)) return new Value(worldFlags.get(flag), "world default", false);
-        if (defaults.containsKey(flag)) return new Value(defaults.get(flag), "global default", false);
-        return new Value(c == null ? (flag.actor() ? "public" : "allow") : flag.defaultValue(),
-                c == null ? "wilderness default" : "built-in default", false);
+        return new Value(flag.behavior(setting.defaultValue(),false),setting.playerEditable()?"claim default":"locked claim default");
     }
     public static Decision check(ClaimState state, Claim claim, UUID actor, Flag flag, Value value, boolean bypass) {
-        if (bypass && !value.enforced()) return new Decision(true, "staff bypass");
+        if (bypass) return new Decision(true, "staff bypass");
         boolean allowed;
         if (!flag.actor()) allowed = value.value().equals("allow");
         else if (value.value().equals("public")) allowed = true;

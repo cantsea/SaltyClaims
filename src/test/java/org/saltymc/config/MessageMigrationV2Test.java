@@ -11,7 +11,7 @@ class MessageMigrationV2Test {
     @Test void upgradesStockInstructionsAndKeepsIndependentVersions() {
         var candidate=prepare("prefix: '[Custom] '\ncommands:\n  tool: 'Select with {selection}, inspect with {inspection}. Right-click two corners, then /claim create. Click an owned corner to resize.'\n  confirm-delete: 'Delete {type} {id}? Within {seconds} seconds: /{command} confirm {token}'\nselection:\n  preview: 'Area {area}; use {command} to save.'\nconfig-version: 1\n");
         Messages messages=Messages.from(candidate.document());
-        assertEquals(1,candidate.from()); assertEquals(ConfigFiles.messagesFile().version(),candidate.to()); assertEquals(6,ConfigFiles.settingsFile().version());
+        assertEquals(1,candidate.from()); assertEquals(ConfigFiles.messagesFile().version(),candidate.to()); assertEquals(7,ConfigFiles.settingsFile().version());
         assertTrue(messages.text("commands.help-player").contains("two opposite corners"));
         assertEquals("",messages.text("selection.preview","area",25));
         String confirmation=messages.text("commands.confirm-delete","type","Root","id","Alex","seconds",30,"command","claim","token","");

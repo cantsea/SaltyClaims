@@ -75,7 +75,7 @@ class SelectionManagerTest {
             manager.finish(player);
         }
         public boolean ready() { return true; }
-        public Settings settings() { return new Settings(new ClaimService.Limits(100,3,20,100,1000000),Material.STICK,Material.BONE,Material.FEATHER,120,duration,parentColor,childColor,Set.of(),Map.of(),Map.of(),Map.of()); }
+        public Settings settings() { return new Settings(new ClaimService.Limits(100,3,20,100,1000000),Material.STICK,Material.BONE,Material.FEATHER,120,duration,parentColor,childColor,Map.of(),Map.of()); }
         public Messages messages() { return Messages.defaults(); }
         public ClaimState state() { return state; }
         public Claim at(Location location) { return new ClaimIndex(state).at(location.getWorld().getUID(),location.getBlockX(),location.getBlockY(),location.getBlockZ()); }

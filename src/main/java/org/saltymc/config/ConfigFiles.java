@@ -6,6 +6,7 @@ import java.nio.file.Path;
 import java.util.*;
 import java.util.function.Consumer;
 import java.util.function.UnaryOperator;
+import java.util.function.Supplier;
 
 /** Editable-file registry. plugin.yml is build metadata, not an editable configuration. */
 public final class ConfigFiles {
@@ -24,8 +25,14 @@ public final class ConfigFiles {
                 new MigrationStep(3,"Add distinct child selection tool; preserve supplied tool choices",document->{}),
                 new MigrationStep(4,"Convert former stock tool set to stick, bone and feather; preserve customized sets",ToolMigrationV4::apply),
                 new MigrationStep(5,"Add full flag and trust reference comments; preserve configured values",document->{}),
-                new MigrationStep(6,"Add configurable parent and child border colors; preserve supplied settings",document->{})
-        ),Set.of("flags.defaults","flags.enforced","worlds"),Settings::from);
+                new MigrationStep(6,"Add configurable parent and child border colors; preserve supplied settings",document->{}),
+                new MigrationStep(7,"Replace typed flag policy with boolean claim defaults and editability",FlagMigrationV7::apply)
+        ),Set.of("claim-flags"),Settings::from,Settings::completeFlags);
+    }
+    public static YamlFileSpec worldsFile(Supplier<Collection<String>> names) {
+        return new YamlFileSpec("worlds.yml",resource("worlds.yml"),List.of(
+                new MigrationStep(1,"Add independent per-world wilderness and claiming switches",document->{})),
+                Set.of(""),WorldSettings::from,document->WorldSettings.complete(document,names.get()));
     }
     public static YamlFileSpec messagesFile() {
         return new YamlFileSpec("messages.yml",resource("messages.yml"),List.of(
@@ -40,14 +47,27 @@ public final class ConfigFiles {
                 new MigrationStep(9,"Remove obsolete explain command message; preserve remaining templates",document->{}),
                 new MigrationStep(10,"Move tool guidance into claim help; preserve customized messages",MessageMigrationV10::apply),
                 new MigrationStep(11,"Add immediate unclaim command messages; preserve existing templates",document->{}),
-                new MigrationStep(12,"Add isolated claim benchmark messages; preserve existing templates",document->{})
+                new MigrationStep(12,"Add isolated claim benchmark messages; preserve existing templates",document->{}),
+                new MigrationStep(13,"Replace claim flag commands with boolean flag toggles",document->{
+                    Map<String,Object> errors=FlagMigrationV7.section(document,"errors");
+                    if("Unknown flag: {flag}. Use /claim flags to see the list.".equals(errors.get("flag-unknown")))
+                        errors.put("flag-unknown","Unknown flag: {flag}. Use /claimflags to see available flags.");
+                    Map<String,Object> protection=FlagMigrationV7.section(document,"protection");
+                    if("You cannot do that in this claim.".equals(protection.get("action-denied")))
+                        protection.put("action-denied","You cannot do that here.");
+                })
         ),Set.of(),Messages::from);
     }
     public static ConfigurationPipeline<RuntimeConfiguration> pipeline(Path directory,Consumer<String> logger) {
         return pipeline(directory,logger,UnaryOperator.identity());
     }
     public static ConfigurationPipeline<RuntimeConfiguration> pipeline(Path directory,Consumer<String> logger,UnaryOperator<String> display) {
-        return new ConfigurationPipeline<>(directory,List.of(settingsFile(),messagesFile()),documents->
-                new RuntimeConfiguration(Settings.from(documents.get("config.yml")),Messages.from(documents.get("messages.yml")).withDisplay(display)),new SafeConfigFiles(),logger);
+        return pipeline(directory,logger,display,List::of);
+    }
+    public static ConfigurationPipeline<RuntimeConfiguration> pipeline(Path directory,Consumer<String> logger,UnaryOperator<String> display,Supplier<Collection<String>> names) {
+        // Save migrated world rules before removing their old config.yml source, so retries are safe.
+        return new ConfigurationPipeline<>(directory,List.of(worldsFile(names),settingsFile(),messagesFile()),documents->
+                new RuntimeConfiguration(Settings.from(documents.get("config.yml"),documents.get("worlds.yml")),Messages.from(documents.get("messages.yml")).withDisplay(display)),
+                new SafeConfigFiles(),logger,documents->FlagMigrationV7.moveWorlds(documents,names.get()));
     }
 }

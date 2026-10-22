@@ -32,8 +32,8 @@ Player commands require a player sender. Context resolves to the child containin
 | `/claim trust <player\|public> [level]` | Set a local grant; omitted level means Build. | `saltyclaims.command.claim.trust` | Owner or scoped Manage; delegation limits apply |
 | `/claim untrust <player\|public\|all>` | Remove local grants; explain remaining inherited/public access. | `saltyclaims.command.claim.untrust` | Owner or scoped Manage; cannot remove peer Manage grants |
 | `/claim trustlist` | Show local and inherited grants and sources. | `saltyclaims.command.claim.trustlist` | Owner or scoped Manage |
-| `/claim flags` | List effective flag values and their sources. | `saltyclaims.command.claim.flags` | Owner or scoped Manage |
-| `/claim flag <key> <value\|reset>` | Set or remove a local flag override. | `saltyclaims.command.claim.flag` plus `saltyclaims.flag.<key>` | Owner; server locks still apply |
+| `/claimflags` | List only flags the sender can edit in their current owned claim. | `saltyclaims.command.claimflags` plus toggle/flag eligibility | Owner |
+| `/claimflag toggle [flag]` | Toggle an editable flag; omitted flag lists available flags. | `saltyclaims.command.claimflag.toggle` plus `saltyclaims.flag.<key>` | Owner; flag must be player-editable |
 | `/claim child create` | Create a child inside the selected root. | `saltyclaims.command.claim.child.create` | Owner or parent Manage |
 | `/claim child restrict <on\|off>` | Disable/enable inherited root trust. | `saltyclaims.command.claim.child.restrict` | Owner |
 
@@ -43,7 +43,7 @@ Every ordinary trust/untrust action targets the child containing the sender, oth
 
 Info shows normalized inclusive corner 1 (minimum X/Y/Z) and corner 2 (maximum X/Y/Z), rather than remembering click order. Full-height claims show labeled X/Z coordinates; bounded child claims also show Y. Owners and managers see the owner plus separate local/inherited lists for Access, Container, Build, and Manage, with `none` for empty levels. Restricted children show inheritance as disabled. List output places each parent before its children and uses two short lines with dimensions, area, world and both corners. Child areas are descriptive and are not charged again.
 
-Children use the normal info, resize, delete, trust, and flag commands once selected, each with its own command permission and the same claim authority checks. Creating a child requires that the selected parent is a root, never another child. New children start with parent trust inheritance disabled. The parent owner retains ownership, and a parent manager who creates a child receives a local Manage grant; no other parent player or public grants carry over. Existing children retain their saved settings. Owners can explicitly enable inheritance with `/claim child restrict off`.
+Children use the normal info, resize, deletion, trust, and standalone flag commands once selected, each with its own command permission and the same claim authority checks. Creating a child requires that the selected parent is a root, never another child. New children start with parent trust inheritance disabled. The parent owner retains ownership, and a parent manager who creates a child receives a local Manage grant; no other parent player or public grants carry over. Existing children retain their saved settings. Owners can explicitly enable inheritance with `/claim child restrict off`.
 
 Regular selection uses the stick (`tools.selection`), child selection the bone (`tools.child-selection`), and inspection the feather (`tools.inspection`), with three distinct configurable items. The child tool selects the parent from the first click, so it must start inside a root the sender owns or manages. Switching away from either claim tool clears both corners, selected parent/resize state and its particle preview immediately. Returning to the tool starts a new selection. Cancelled item switches preserve selection. The mode commands and their `saltyclaims.command.claim.mode.basic` / `mode.child` permissions are removed. Tool actions retain their normal create/child-create/resize permissions.
 
@@ -69,8 +69,6 @@ GP-style actions are exposed through `/claim` subcommands only. For example, `/c
 | `/claima trust <owner> ...` | Manage trust in an explicit claim. | `saltyclaims.command.claima.trust` | Player or console |
 | `/claima untrust <owner> <player\|public\|all>` | Remove local trust grants. | `saltyclaims.command.claima.untrust` | Player or console |
 | `/claima trustlist <owner>` | Inspect local/inherited trust grants. | `saltyclaims.command.claima.trustlist` | Player or console |
-| `/claima flag <owner> ...` | Edit a claim override; does not defeat server locks. | `saltyclaims.command.claima.flag` | Player or console |
-| `/claima flags <owner>` | List effective flag values and sources. | `saltyclaims.command.claima.flags` | Player or console |
 | `/claima balance show <player>` | Inspect starting, earned, bonus, and used allowance. | `saltyclaims.command.claima.balance.show` | Player or console |
 | `/claima balance set <player> <amount>` | Set bonus allowance. | `saltyclaims.command.claima.balance.set` | Player or console |
 | `/claima balance add <player> <amount>` | Add bonus allowance. | `saltyclaims.command.claima.balance.add` | Player or console |
@@ -84,7 +82,7 @@ GP-style actions are exposed through `/claim` subcommands only. For example, `/c
 
 Each administrative action requires its exact command permission; there is no shared edit permission. Gameplay bypass does not authorize deletion, trust changes, policy configuration, or allowance changes. Configuration locks cannot be overridden with a claim flag command. Staff use the explicit `/claima` action for administrative authority rather than gaining unrelated player command capabilities.
 
-Admin resize syntax is `/claima resize <owner> <minX> <minZ> <maxX> <maxZ> [minY maxY]`. If coordinates are omitted, a player sender's selection is used. Root claims remain full height. Trust syntax is `/claima trust <owner> <player|public> [level]`; flag syntax is `/claima flag <owner> <key> <value|reset>`. Console requires explicit coordinates for resizing. Admin resizes can exceed the owner's allowance, but still obey size, containment, overlap, and world rules.
+Admin resize syntax is `/claima resize <owner> <minX> <minZ> <maxX> <maxZ> [minY maxY]`. If coordinates are omitted, a player sender's selection is used. Root claims remain full height. Trust syntax is `/claima trust <owner> <player|public> [level]`. Console requires explicit coordinates for resizing. Admin resizes can exceed the owner's allowance, but still obey size, containment, overlap, and world rules.
 
 For example, `/claima trust Alex Sam build --at world 100 64 200` grants Sam Build in Alex's claim at those coordinates. `/claima inspect here --at world 100 64 200` inspects that location without requiring a known owner name.
 
@@ -98,6 +96,8 @@ Server-wide resets have their own command and confirmation, without owner/locati
 
 | Node | Default | Meaning |
 | --- | --- | --- |
+| `saltyclaims.command.claimflags` | `true` | List available flag edits in an owned claim. |
+| `saltyclaims.command.claimflag.toggle` | `true` | Toggle an eligible flag in an owned claim. |
 | `saltyclaims.command.unclaim` | `true` | Immediately remove the sender's claim at their position. |
 | `saltyclaims.command.unclaim.all` | `true` | Immediately remove every claim owned by the sender across worlds; independent of the base node. |
 | Each concrete `saltyclaims.command.claim.<path>` node listed above | `true` individually | Its exact player subcommand, subject to claim authority and limits. |
@@ -109,16 +109,16 @@ No wildcard or aggregate permission nodes are registered. Player permissions do 
 
 ### Registered flags
 
-Each key below has its own `saltyclaims.flag.<key>` permission. Actor flags accept `public`, `access`, `container`, `build`, `manage`, `owner`, or `deny`. Environment/boundary flags accept `allow` or `deny`. `reset` removes the local override.
+Each key below has its own `saltyclaims.flag.<key>` permission. All flags are boolean switches. In claims, true permits an actor action only with the normal trust level shown below; false denies it even for the owner. Environment/boundary flags use true for allow and false for deny. There is no value/reset command. `/claimflag toggle [flag]` flips the effective value in the child here, otherwise the parent. The old `/claim flag`, `/claim flags`, `/claima flag`, and `/claima flags` routes and their permissions are removed. The new commands accept no remote or root selectors; stand in the region to edit it.
 
-| Keys | Built-in claim default |
+| Keys | Trust requirement when enabled / environmental default |
 | --- | --- |
 | `block-break`, `block-place`, `bucket-use`, `animal-damage`, `decoration-edit`, `vehicle-edit`, `ignite` | `build` |
 | `container-use`, `utility-use`, `crop-harvest`, `crop-replant`, `animal-interact` | `container` |
 | `door-use`, `switch-use`, `bed-use`, `vehicle-use` | `access` |
 | `pvp`, `explosion-block-damage`, `explosion-entity-damage`, `fire-spread`, `mob-block-grief`, `fluid-crossing`, `piston-crossing`, `hopper-crossing` | `deny` |
 
-Missing configuration uses these defaults inside claims and permissive behavior in wilderness. Explicit global/world configuration also applies in wilderness. Enforced values win everywhere. Restricted children still inherit parent flag values. Actor `deny` blocks owners until they change the setting; environmental policy has no owner exemption.
+The trust thresholds above are fixed. Actor flags default to true and environment/boundary flags to false in config.yml. Every flag defaults to player-editable: false, which ignores existing saved overrides and uses the configured default. When editable, child override > parent override > configured default, independently of trust inheritance. Listing and completion require ownership and command/config/flag permission; unrelated or trusted players cannot see editable choices. Staff bypass does not grant editing authority. Wilderness uses only worlds.yml, with false denying and true allowing each behavior even when claiming is false. Missing worlds allow wilderness behavior and disable new claiming by default. There is no enforcement layer.
 
 ## Reference requirements
 

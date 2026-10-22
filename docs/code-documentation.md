@@ -21,6 +21,7 @@ The plugin implements SQLite-backed root/child claims, selection tools, area all
 | `storage/SqliteStore.java` | Single SQLite connection, schema v1, transactional deltas, integrity checks, and backups. |
 | `diagnostics/ClaimBenchmark.java` | Bounded synthetic lookup/edit/SQLite benchmarks and correctness checks, independent of Bukkit/live state. |
 | `selection/SelectionManager.java` | Transient corner/mode/resize state and bounded particle previews. |
+| `command/ClaimFlagCommands.java` | Owner-only flag listing, boolean toggles, and filtered completion through a shared authorization path. |
 | `command/ClaimCommands.java` | Executable paths, per-path permission registration, help/completion, management, and confirmations. |
 | `command/ClaimView.java` | Normalized corners/dimensions, ordered owner claim trees, and grouped trust presentation. |
 | `command/DeleteConfirmations.java` | Sender-bound deletion snapshots, original permissions, and expiry without public tokens. |
@@ -32,7 +33,8 @@ The plugin implements SQLite-backed root/child claims, selection tools, area all
 | `config/ConfigurationPipeline.java` | Shared prepare/validate/backup/save/apply/publish pipeline and overlapping-operation guard. |
 | `config/SafeConfigFiles.java` | Exact private backups, file-change checks, flushed staging, and atomic replacement/fallback. |
 | `config/YamlData.java`, `YamlFileSpec.java`, `MigrationStep.java` | Strict parsing, reconciliation, bundled comments/order, and conflict-safe migration helpers. |
-| `src/main/resources/config.yml` | Administrator defaults. |
+| `src/main/resources/config.yml` | Claim behavior defaults and player editability, limits and tools. |
+| `config/WorldSettings.java`, `src/main/resources/worlds.yml` | Per-world claiming and independent boolean wilderness rules. |
 | `src/main/resources/messages.yml` | Configurable response templates and the automatic global prefix. |
 | `message/` | Immutable message snapshots/notices, configurable validation errors, and centralized prefixed delivery. |
 | `src/test/java/` | Geometry, trust, flags, command permission, configuration, and database tests. |
@@ -69,7 +71,7 @@ Protection checks perform no database I/O. Claims are bounded to 65,536 indexed 
 
 ## Message delivery
 
-All player/console chat responses flow through `Messages`, including help/list output and asynchronous replies. `messages.yml` supplies templates and one global `prefix`; the service applies it once to each line. Validation uses `MessageException` with stable keys and placeholders. `Notice` carries immutable success data across the storage worker. Configuration reload validates both candidate files before publishing either. See [Messages](messages.md).
+All player/console chat responses flow through `Messages`, including help/list output and asynchronous replies. `messages.yml` supplies templates and one global `prefix`; the service applies it once to each line. Validation uses `MessageException` with stable keys and placeholders. `Notice` carries immutable success data across the storage worker. Configuration reload validates config.yml, worlds.yml and messages.yml before publishing one immutable bundle. See [Messages](messages.md).
 
 Player names and claim locations form the public command/message interface. Stable UUIDs remain internal database keys. `HumanNames` renders identifiers in final outgoing lines, including custom legacy templates and diagnostic maps; missing names use configurable friendly labels. Deleted claims capture their display description before removal.
 
@@ -108,3 +110,9 @@ The API adapters compile against the pinned target. A live Paper boot and two-cl
 ## Maintenance
 
 Document new components, their responsibilities, data flow, and persistence behavior as they are implemented. Keep command behavior and permission defaults in [Commands and permissions](commands-permissions.md).
+
+## Flag configuration
+
+Policy.resolve separates claims from wilderness. Wilderness reads the named WorldSettings only, independent of its claiming switch. Claims use Settings.ClaimFlag: locked defaults override saved grants; otherwise child > parent > configured default. Enabled actor switches retain fixed trust thresholds; disabled switches deny owners too. SQLite stores boolean overrides as strings and accepts legacy typed values on load; enabled legacy actor values resolve using the fixed threshold. Staff gameplay bypass remains separate from editing authority.
+
+Worlds are discovered at startup, world load and reload; absent world rules allow wilderness behavior and disable claiming. Config migration 7 moves legacy world policy into worlds.yml before removing it from config.yml. ConfigurationPipeline reads and snapshots every source before the bundle migration, validates the entire candidate, backs up changed originals, saves worlds first for safe migration retries, and publishes after application. YamlFileSpec supports an open root for literal world names and fills missing per-world flags without replacing supplied null/invalid values.

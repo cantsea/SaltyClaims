@@ -107,11 +107,11 @@ public final class ClaimBenchmark {
         for(Query query:scenario.queries()) {
             Claim found=index.at(WORLD,query.x(),query.y(),query.z());
             require(Objects.equals(query.expected(),found==null?null:found.id()),"Lookup mismatch");
-            Policy.Value value=Policy.resolve(state,found,Flag.BLOCK_BREAK,"synthetic",Map.of(),Map.of(),Map.of());
+            Policy.Value value=Policy.resolve(state,found,Flag.BLOCK_BREAK,"synthetic",Map.of(),Map.of());
             boolean expected=found==null||found.root()||found.inheritTrust();
             require(Policy.check(state,found,FRIEND,Flag.BLOCK_BREAK,value,false).allowed()==expected,"Trust/policy mismatch");
         }
-        require(!Policy.check(state,first,VISITOR,Flag.BLOCK_BREAK,Policy.resolve(state,first,Flag.BLOCK_BREAK,"synthetic",Map.of(),Map.of(),Map.of()),false).allowed(),"Visitor unexpectedly allowed");
+        require(!Policy.check(state,first,VISITOR,Flag.BLOCK_BREAK,Policy.resolve(state,first,Flag.BLOCK_BREAK,"synthetic",Map.of(),Map.of()),false).allowed(),"Visitor unexpectedly allowed");
         measure("index rebuild",options.samples(),1,()->{ sink^=new ClaimIndex(state).at(WORLD,first.bounds().minX()+12,64,first.bounds().minZ()+12).revision(); });
         measure("mixed lookup (batch mean)",options.batches(),options.queries(),()->{
             long checksum=0; for(Query query:scenario.queries()) { Claim found=index.at(WORLD,query.x(),query.y(),query.z()); if(found!=null) checksum^=found.id().getLeastSignificantBits(); } sink=checksum;
@@ -119,7 +119,7 @@ public final class ClaimBenchmark {
         measure("lookup + policy (batch mean)",options.batches(),options.queries(),()->{
             long allowed=0; for(Query query:scenario.queries()) {
                 Claim found=index.at(WORLD,query.x(),query.y(),query.z());
-                if(Policy.check(state,found,FRIEND,Flag.BLOCK_BREAK,Policy.resolve(state,found,Flag.BLOCK_BREAK,"synthetic",Map.of(),Map.of(),Map.of()),false).allowed()) allowed++;
+                if(Policy.check(state,found,FRIEND,Flag.BLOCK_BREAK,Policy.resolve(state,found,Flag.BLOCK_BREAK,"synthetic",Map.of(),Map.of()),false).allowed()) allowed++;
             } sink=allowed;
         });
         ClaimService.Limits limits=new ClaimService.Limits(Long.MAX_VALUE/2,3,20000,100,1000000);

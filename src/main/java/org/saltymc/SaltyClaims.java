@@ -10,9 +10,11 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.event.*;
 import org.bukkit.event.player.PlayerLoginEvent;
+import org.bukkit.event.world.WorldLoadEvent;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.saltymc.claim.*;
 import org.saltymc.command.ClaimCommands;
+import org.saltymc.command.ClaimFlagCommands;
 import org.saltymc.config.*;
 import org.saltymc.flag.*;
 import org.saltymc.protection.ProtectionListener;
@@ -30,7 +32,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import java.util.logging.Level;
 
-public final class SaltyClaims extends JavaPlugin implements Listener,SelectionManager.Port {
+public final class SaltyClaims extends JavaPlugin implements Listener,SelectionManager.Port,ClaimFlagCommands.Port {
     private ClaimState state = ClaimState.empty();
     private ClaimIndex index = new ClaimIndex(state);
     private ConfigurationPipeline<ConfigFiles.RuntimeConfiguration> configuration;
@@ -49,7 +51,8 @@ public final class SaltyClaims extends JavaPlugin implements Listener,SelectionM
     @Override
     public void onEnable() {
         try {
-            configuration=ConfigFiles.pipeline(getDataFolder().toPath(),message->getLogger().info(message),names::replaceIdentifiers);
+            configuration=ConfigFiles.pipeline(getDataFolder().toPath(),message->getLogger().info(message),names::replaceIdentifiers,
+                    ()->Bukkit.getWorlds().stream().map(World::getName).toList());
             applyConfiguration();
             // No database or worker starts until every editable file is validated, saved and applied.
             worker = Executors.newSingleThreadExecutor(r -> { Thread t = new Thread(r, "SaltyClaims-storage"); t.setDaemon(true); return t; });
@@ -61,7 +64,7 @@ public final class SaltyClaims extends JavaPlugin implements Listener,SelectionM
         ClaimCommands commands = new ClaimCommands(this);
         selections = new SelectionManager(this,commands::commitSelection);
         commands.registerPermissions();
-        for (String name : List.of("claim", "claima", "unclaim")) {
+        for (String name : List.of("claim", "claima", "unclaim", "claimflag", "claimflags")) {
             Objects.requireNonNull(getCommand(name)).setExecutor(commands);
             Objects.requireNonNull(getCommand(name)).setTabCompleter(commands);
         }
@@ -90,6 +93,11 @@ public final class SaltyClaims extends JavaPlugin implements Listener,SelectionM
         if (!ready && !event.getPlayer().hasPermission("saltyclaims.admin.recovery"))
             event.disallow(PlayerLoginEvent.Result.KICK_OTHER, String.join("\n",messages().lines(Notice.of("protection.kick"))));
     }
+    @EventHandler public void worldLoaded(WorldLoadEvent event) {
+        if(!ready()||settings().worlds().containsKey(event.getWorld().getName())) return;
+        try { applyConfiguration(); }
+        catch(Exception e) { getLogger().severe("Could not add world to worlds.yml; new world uses default wilderness permissions with claiming disabled: "+e.getMessage()); }
+    }
     public ClaimState state() { return state; }
     public Settings settings() { return configuration.current().settings(); }
     public Messages messages() { return configuration==null||configuration.current()==null?Messages.defaults():configuration.current().messages(); }
@@ -107,7 +115,7 @@ public final class SaltyClaims extends JavaPlugin implements Listener,SelectionM
     }
     public void forget(UUID player) { bypass.remove(player); lastDenial.remove(player); }
     public Policy.Value value(Claim c, Flag flag, World world) {
-        return Policy.resolve(state, c, flag, world.getName(), settings().defaults(), settings().enforced(), settings().worlds());
+        return Policy.resolve(state, c, flag, world.getName(), settings().claimFlags(), settings().worlds());
     }
     public Policy.Decision decision(Player p, Location location, Flag flag) {
         if (!ready()) return new Policy.Decision(false, messages().text("protection.maintenance"));

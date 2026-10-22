@@ -19,13 +19,18 @@ public enum Flag {
     Flag(String value, boolean actor) { this.defaultValue = value; this.actor = actor; }
     public String key() { return name().toLowerCase(Locale.ROOT).replace('_', '-'); }
     public String defaultValue() { return defaultValue; }
+    /** Boolean switches keep trust thresholds fixed; legacy values remain readable from SQLite. */
+    public boolean enabled(String value) { return !value.equals("deny") && !value.equals("false"); }
+    public String behavior(boolean enabled,boolean wilderness) {
+        return enabled ? (actor ? (wilderness ? "public" : defaultValue) : "allow") : "deny";
+    }
     public boolean actor() { return actor; }
     public List<String> valuesAllowed() {
         return actor ? List.of("public", "access", "container", "build", "manage", "owner", "deny") : List.of("allow", "deny");
     }
     public String validate(String value) {
         value = value.toLowerCase(Locale.ROOT);
-        if (!valuesAllowed().contains(value)) throw new MessageException("errors.flag-values","flag",key(),"values",String.join(", ",valuesAllowed()));
+        if (!value.equals("true") && !value.equals("false") && !valuesAllowed().contains(value)) throw new MessageException("errors.flag-values","flag",key(),"values",String.join(", ",valuesAllowed()));
         return value;
     }
     public static Flag parse(String key) {

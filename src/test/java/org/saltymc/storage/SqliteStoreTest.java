@@ -13,6 +13,13 @@ import static org.saltymc.Fixtures.*;
 
 class SqliteStoreTest {
     @TempDir Path directory;
+    @Test void booleanFlagOverridesPersistAlongsideLegacyFlagsAcrossRestart() throws Exception {
+        Path db=directory.resolve("claims.db"); Claim root=root(0,9);
+        root=root.change(root.bounds(),true,Map.of(),Map.of(Flag.PVP,"true",Flag.BLOCK_BREAK,"false",Flag.CONTAINER_USE,"container"));
+        ClaimState expected=state(root);
+        try(SqliteStore store=new SqliteStore(db)) { store.save(ClaimState.empty(),expected); }
+        try(SqliteStore reopened=new SqliteStore(db)) { assertEquals(expected,reopened.load()); }
+    }
     @Test void roundTripRootsChildrenTrustFlagsAndBalances() throws Exception {
         Path db=directory.resolve("claims.db"); Claim root=root(0,9); root=root.change(root.bounds(),true,Map.of(Subject.PUBLIC,Trust.ACCESS,new Subject(FRIEND),Trust.MANAGE),Map.of(Flag.PVP,"allow"));
         Claim child=child(root,-64,30); child=child.change(child.bounds(),false,Map.of(new Subject(STRANGER),Trust.CONTAINER),Map.of(Flag.BLOCK_BREAK,"owner"));

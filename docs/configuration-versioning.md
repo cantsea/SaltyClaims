@@ -2,7 +2,7 @@
 
 ## Independent versions
 
-The editable file registry is `config.ConfigFiles`. It currently manages `config.yml` and `messages.yml`, each with its own positive integer `config-version` as the last setting. Current versions are 6 for `config.yml` and 12 for `messages.yml`. These versions are independent of each other, the plugin release (`1.0-SNAPSHOT`), and SQLite's schema version. `plugin.yml` is packaged plugin metadata, not a runtime-editable settings file.
+The editable file registry is `config.ConfigFiles`. It currently manages `config.yml`, `worlds.yml`, and `messages.yml`, each with its own positive integer `config-version` as the last setting. Current versions are 7 for `config.yml`, 1 for `worlds.yml`, and 13 for `messages.yml`. These versions are independent of each other, the plugin release (`1.0-SNAPSHOT`), and SQLite's schema version. `plugin.yml` is packaged plugin metadata, not a runtime-editable settings file.
 
 Missing files are created from the current bundled resource after the whole bundle passes validation. Existing blank/comment-only files or mappings without `config-version` are legacy version 0. Explicit zero, negative, fractional, quoted, boolean, null, out-of-range, or future versions are rejected without overwriting supplied files. Do not manually change version numbers to bypass migrations or downgrade.
 
@@ -16,6 +16,9 @@ Missing files are created from the current bundled resource after the whole bund
 | `config.yml` | 3 -> 4 | Customized tool sets and all other settings | Current missing defaults: stick, bone, feather | Intentionally convert the entire former stock golden-shovel / iron-shovel / stick set to stick / bone / feather. Missing members are treated as former defaults for stock-set detection. If any supplied tool differs, preserve the whole customized set; normal distinct-item validation still applies. No renamed/removed paths |
 | `config.yml` | 4 -> 5 | Every configured value, including tool choices, flags and worlds | Bundled comments documenting every flag/default and cumulative trust access | None; no renamed, removed, or intentionally replaced settings |
 | `config.yml` | 5 -> 6 | All existing settings, including valid supplied color values | `border-colors.parent` (yellow `#FFFF00`) and `border-colors.child` (cyan `#00FFFF`), strictly validated quoted six-digit hex strings | None; no renamed, removed, or intentionally replaced values |
+| `config.yml` | 6 -> 7 | Limits, tools, colors, explicit world behavior and existing claiming availability | Boolean claim-flags defaults/editability, independent worlds.yml | Remove flags.defaults, flags.enforced, worlds and disabled-worlds. Convert deny to false and other legacy values to true; action trust thresholds become fixed. Enforced values become locked claim defaults. Exact source backups precede writes; worlds save before config removal. |
+| `worlds.yml` | 0 -> 1 | Supplied world entries and booleans | Complete flags and loaded world entries, all true; claiming false | Import legacy explicit world/global/enforced wilderness values once; explicit new world entries win. |
+| `messages.yml` | 12 -> 13 | Custom templates and prefix | No-editable-flags and flag-lock messages | Update only stock flag-unknown command guidance and stock action-denied wording; remove obsolete flag-enforced message. |
 | `messages.yml` | 0 -> 1 | Supplied valid prefix and message templates | Independent metadata and missing current messages | None |
 | `messages.yml` | 1 -> 2 | Custom prefix and customized template wording except exact obsolete command spellings | Player/world/claim labels and named-target errors | Replace unchanged stock tool, targeting, overlap, and deletion instructions; convert old confirmation/ID command spellings in custom strings; remove obsolete `errors.uuid` during reconciliation |
 | `messages.yml` | 2 -> 3 | Custom prefix/templates and legacy deletion placeholders | `labels.claim`, `labels.child-claim` | Replace only exact former stock `commands.confirm-delete`, `commands.mode-child`, `errors.select-root`, and `errors.child-mode` text with simple claim/child deletion and automatic-height instructions; no renamed/removed paths |
@@ -43,9 +46,9 @@ All sections are fixed-schema unless explicitly opened by a file specification:
 
 | File / open path | Preservation and separate validation |
 | --- | --- |
-| `config.yml`: `worlds` | Retain administrator world names, including literal dots, and their complete flag maps. Every world entry must be a mapping and each nested key/value must match the flag registry/type. Worlds may be unloaded or created later. |
-| `config.yml`: `flags.defaults` | Retain configured flag entries. Validate every key against the flag registry and every value against that flag's allowed strings. |
-| `config.yml`: `flags.enforced` | Same validation/preservation as defaults, with enforced runtime semantics. |
+| Legacy `config.yml`: `worlds` (migrated to `worlds.yml`) | Retain administrator world names, including literal dots, and their complete flag maps. Every world entry must be a mapping and each nested key/value must match the flag registry/type. Worlds may be unloaded or created later. |
+| `config.yml`: `claim-flags` | Require known flag keys and boolean default/player-editable fields. Fill missing defaults without coercing invalid supplied values. |
+| `worlds.yml`: root world entries | Literal world names, boolean claiming, and known boolean wilderness flags. Loaded worlds and missing flags are added with true wilderness defaults and claiming false. |
 | `messages.yml`: none | All message paths are fixed. Obsolete/custom paths are removed during reconciliation and retained in exact backups. |
 
 The plugin has no kits, rewards, requirements, or arbitrary gameplay sections. If a future feature introduces an administrator-defined tree, declare its open path and write a separate validator; do not prune its nested custom options using the bundled example tree as a fixed schema. Generic tests exercise this using isolated fixtures, not plugin gameplay migrations.

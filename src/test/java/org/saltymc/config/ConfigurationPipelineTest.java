@@ -45,7 +45,7 @@ class ConfigurationPipelineTest {
         String original="# Private custom comment\r\nclaims:\r\n  starting-blocks: 54321\r\ndisabled-worlds: [world_nether]\r\n";
         write("config.yml",original);
         ConfigFiles.RuntimeConfiguration result=ConfigFiles.pipeline(directory,ignored->{}).update(candidate->{},candidate->{});
-        assertEquals(54321,result.settings().limits().starting()); assertEquals(Set.of("world_nether"),result.settings().disabledWorlds());
+        assertEquals(54321,result.settings().limits().starting()); assertFalse(result.settings().world("world_nether").claiming());
         assertEquals(1,backups().size()); assertArrayEquals(bytes(original),Files.readAllBytes(backups().getFirst()));
         String rewritten=Files.readString(directory.resolve("config.yml"));
         assertTrue(rewritten.contains("# Root claims cover full world height")); assertFalse(rewritten.contains("Private custom comment"));
@@ -128,9 +128,10 @@ class ConfigurationPipelineTest {
     @Test void realOpenWorldsAndFlagsPreserveLiteralDottedNamesAndRejectUnknownReferences() throws Exception {
         Path path=write("config.yml","worlds:\n  world.custom:\n    pvp: allow\nflags:\n  defaults:\n    block-break: owner\n");
         var pipeline=ConfigFiles.pipeline(directory,ignored->{}); var snapshot=pipeline.update(candidate->{},candidate->{});
-        assertEquals("allow",snapshot.settings().worlds().get("world.custom").get(Flag.PVP));
-        assertEquals("owner",snapshot.settings().defaults().get(Flag.BLOCK_BREAK));
-        assertTrue(Files.readString(path).contains("world.custom:"));
+        assertTrue(snapshot.settings().world("world.custom").allows(Flag.PVP));
+        assertTrue(snapshot.settings().claimFlag(Flag.BLOCK_BREAK).defaultValue());
+        assertFalse(Files.readString(path).contains("worlds:"));
+        assertTrue(Files.readString(directory.resolve("worlds.yml")).contains("world.custom:"));
         write("config.yml","worlds:\n  world.custom:\n    missing-flag: allow\n");
         ConfigException e=assertThrows(ConfigException.class,()->pipeline.update(candidate->{},candidate->{}));
         assertTrue(e.getMessage().contains("worlds.world.custom.missing-flag")); assertSame(snapshot,pipeline.current());
@@ -256,7 +257,7 @@ class ConfigurationPipelineTest {
         assertThrows(ConfigException.class,()->pipeline.update(candidate->{throw new ConfigException("preflight rejected");},candidate->starts.incrementAndGet()));
         assertEquals(0,starts.get()); assertNull(pipeline.current()); assertFalse(Files.exists(directory.resolve("config.yml")));
         var current=pipeline.update(candidate->{},candidate->starts.incrementAndGet()); assertEquals(1,starts.get());
-        assertThrows(UnsupportedOperationException.class,()->current.settings().worlds().put("x",Map.of()));
+        assertThrows(UnsupportedOperationException.class,()->current.settings().worlds().put("x",WorldSettings.defaults()));
     }
     @Test void backupAccessIsRestrictedWhenFilesystemSupportsIt() throws Exception {
         YamlFileSpec spec=spec("sample.yml","value: default\nconfig-version: 1\n",adoption(),Set.of()); write("sample.yml","value: PRIVATE\n");

@@ -1,0 +1,8 @@
+# Worlds are added at startup, world load and /claima reload.
+# Each world has claiming: false and a complete wilderness-flags list by default.
+# claiming controls creation only; existing claims remain protected.
+# Wilderness flags apply only outside claims, even when claiming is disabled.
+# false DENIES the behavior; true ALLOWS it. Every wilderness flag starts true.
+# Claim defaults and owner-editable flags are configured separately in config.yml.
+# World names (including dots) are literal. Do not edit config-version.
+config-version: 1
