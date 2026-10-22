@@ -22,7 +22,7 @@ border-colors:
 # Visitors have no trust; Access < Container < Build < Manage < Owner.
 # Manage can delegate lower trust and create children; only owners edit flags.
 # New children keep only the parent owner and their creating manager's trust.
-# Child flags inherit parent overrides, independently of trust inheritance.
+# Children use their own flag overrides or these defaults; parent flags never apply.
 # player-editable: false locks this flag to its configured default in every claim.
 # player-editable: true lets owners with the flag permission toggle it locally.
 # Wilderness rules and world claiming switches are exclusively in worlds.yml.
@@ -125,4 +125,4 @@ claim-flags:
     player-editable: false
 
 # Independent configuration schema version. Managed automatically; do not edit.
-config-version: 7
+config-version: 8

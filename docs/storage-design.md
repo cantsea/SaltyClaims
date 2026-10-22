@@ -29,7 +29,7 @@ The initial design uses SQLite's standard rollback journal with `synchronous=FUL
 
 For the proposed GP-style allowance system, player records separate starting, earned, and bonus allowance; used area derives from committed roots. Claim mutations and related allowance changes must be transactionally consistent. See [Plugin plan](plugin-plan.md) for proposed feature semantics.
 
-Trust records use an explicit subject type (`PLAYER` or `PUBLIC`) and a stable level (`access`, `container`, `build`, `manage`), with at most one local grant per claim/subject. A public subject is not a fake player UUID. Child records also persist a trust-inheritance mode; restricting trust does not stop flag inheritance.
+Trust records use an explicit subject type (`PLAYER` or `PUBLIC`) and a stable level (`access`, `container`, `build`, `manage`), with at most one local grant per claim/subject. A public subject is not a fake player UUID. The legacy trust-inheritance column remains readable for schema compatibility, but children always normalize it to false. Parent trust and flags never apply to a child.
 
 ### Bounds and future child claims
 
@@ -41,11 +41,11 @@ The proposed claim record includes:
 
 Represent full height explicitly through absent Y bounds, rather than storing a world's current height limits or artificial extreme values. Full-height claims therefore continue to cover the world's buildable height if world height limits change.
 
-The implementation accepts parentless full-height roots and full-height or bounded children. Root ownership is stored only on roots and derived for children. Trust inheritance is persisted per child; flags inherit independently.
+The implementation accepts parentless full-height roots and full-height or bounded children. Root ownership is stored only on roots and derived for children. The legacy inheritance column is retained, but child trust and flags are independent of the parent.
 
 When child claims are introduced, require the same world as their parent, complete containment in the parent volume, and an acyclic parent relationship. Root claims cannot overlap in X/Z. Ancestor/descendant overlap is intentional. Ordinary block bounds are inclusive, so two regions cannot own the same boundary block unless they are in a permitted ancestor/descendant relationship.
 
-One child level is a confirmed requirement. The implementation enforces no sibling 3D intersection, root ownership for all children, optional trust inheritance/restriction, independent flag inheritance, rejection of root resizes that exclude children, and confirmed transactional tree deletion. Stacked 3D siblings can share X/Z when their Y ranges are disjoint. Child ownership is derived from the root rather than maintained as an independently editable duplicate owner.
+One child level is a confirmed requirement. The implementation enforces no sibling 3D intersection, root ownership for all children, independent child trust and flag defaults, rejection of root resizes that exclude children, and confirmed transactional tree deletion. Stacked 3D siblings can share X/Z when their Y ranges are disjoint. Child ownership is derived from the root rather than maintained as an independently editable duplicate owner.
 
 Use primary keys, uniqueness constraints, and foreign keys to enforce record identity and prevent orphaned trust or flag entries. Delete related claim data in the same transaction as its claim.
 

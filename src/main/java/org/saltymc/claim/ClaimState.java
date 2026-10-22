@@ -28,7 +28,7 @@ public record ClaimState(Map<UUID, Claim> claims, Map<UUID, Account> accounts) {
         if (owner(c).equals(player)) return Trust.OWNER;
         Trust local = Trust.highest(c.trust().getOrDefault(Subject.PUBLIC, Trust.VISITOR),
                 c.trust().getOrDefault(new Subject(player), Trust.VISITOR));
-        return !c.root() && c.inheritTrust() ? Trust.highest(local, trust(root(c), player)) : local;
+        return local;
     }
     public void validate() {
         for (Claim c : claims.values()) {

@@ -108,7 +108,7 @@ public final class ClaimBenchmark {
             Claim found=index.at(WORLD,query.x(),query.y(),query.z());
             require(Objects.equals(query.expected(),found==null?null:found.id()),"Lookup mismatch");
             Policy.Value value=Policy.resolve(state,found,Flag.BLOCK_BREAK,"synthetic",Map.of(),Map.of());
-            boolean expected=found==null||found.root()||found.inheritTrust();
+            boolean expected=found==null||found.root();
             require(Policy.check(state,found,FRIEND,Flag.BLOCK_BREAK,value,false).allowed()==expected,"Trust/policy mismatch");
         }
         require(!Policy.check(state,first,VISITOR,Flag.BLOCK_BREAK,Policy.resolve(state,first,Flag.BLOCK_BREAK,"synthetic",Map.of(),Map.of()),false).allowed(),"Visitor unexpectedly allowed");

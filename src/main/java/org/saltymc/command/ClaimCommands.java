@@ -21,8 +21,8 @@ import java.util.*;
 
 /** All executable paths are independently permission-gated; roots have no blanket gate. */
 public final class ClaimCommands implements CommandExecutor, TabCompleter, Listener {
-    public static final List<String> PLAYER_PATHS = List.of("help", "resize", "cancel", "info", "list",
-            "trust", "untrust", "trustlist", "child.create", "child.restrict");
+    public static final List<String> PLAYER_PATHS = List.of("help", "cancel", "info", "list",
+            "trust", "untrust", "trustlist");
     public static final List<String> ADMIN_PATHS = List.of("help", "inspect", "bypass", "delete", "resize", "trust", "untrust", "trustlist",
             "balance.show", "balance.set", "balance.add", "balance.remove", "reload", "backup", "test", "delete.confirm", "reset.all", "reset.all.confirm");
     private final SaltyClaims plugin;
@@ -41,8 +41,10 @@ public final class ClaimCommands implements CommandExecutor, TabCompleter, Liste
     public void registerPermissions() {
         for (boolean admin : List.of(false,true)) for (String path : admin?ADMIN_PATHS:PLAYER_PATHS)
             register(permission(admin,path), admin?PermissionDefault.OP:PermissionDefault.TRUE);
-        // Existing creation permission still controls the regular claim tool; it is no longer a command route.
+        // Player geometry permissions control tools only, not executable command routes.
         register(permission(false,"create"),PermissionDefault.TRUE);
+        register(permission(false,"child.create"),PermissionDefault.TRUE);
+        register(permission(false,"resize"),PermissionDefault.TRUE);
         register(unclaimPermission(false),PermissionDefault.TRUE);
         register(unclaimPermission(true),PermissionDefault.TRUE);
         register(ClaimFlagCommands.LIST,PermissionDefault.TRUE);
@@ -102,11 +104,11 @@ public final class ClaimCommands implements CommandExecutor, TabCompleter, Liste
             if (a.isEmpty()) a.add("help");
             if(admin&&explicit!=null) a.add(1,explicit);
             String path = a.getFirst().toLowerCase(Locale.ROOT);
-            if (Set.of("child","balance","reset").contains(path)) path += "." + arg(a,1,"/"+label+" "+path+" <subcommand>").toLowerCase(Locale.ROOT);
+            if (Set.of("balance","reset").contains(path)) path += "." + arg(a,1,"/"+label+" "+path+" <subcommand>").toLowerCase(Locale.ROOT);
             if(path.equals("reset.all")&&a.size()>2&&a.get(2).equalsIgnoreCase("confirm")) path="reset.all.confirm";
             if(path.equals("delete")&&explicit==null&&a.size()>1&&a.get(1).equalsIgnoreCase("confirm")) path="delete.confirm";
             if (!(admin?ADMIN_PATHS:PLAYER_PATHS).contains(path)) throw new MessageException("errors.unknown-command","command",label);
-            selectionAction=Set.of("child.create","resize").contains(path);
+            selectionAction=path.equals("resize");
             String node = permission(admin,path); require(sender,node);
             if (path.equals("help")) {
                 if(!admin) {
@@ -160,7 +162,6 @@ public final class ClaimCommands implements CommandExecutor, TabCompleter, Liste
                 long total=plugin.state().accounts().getOrDefault(who,new ClaimState.Account(0,0)).total(plugin.settings().limits().starting());
                 messages().send(sender,"commands.allowance","used",plugin.state().used(who),"total",total); return true;
             }
-            if (path.equals("child.create")) { create(player(sender),true); return true; }
             Claim claim=target(sender,explicit,explicitLocation,rootScope,admin,a);
             if (path.equals("info")||path.equals("inspect")) { info(sender,claim,admin); return true; }
             if (path.equals("resize")) { resize(sender,claim,admin,a); return true; }
@@ -169,16 +170,7 @@ public final class ClaimCommands implements CommandExecutor, TabCompleter, Liste
             if (path.equals("trustlist")) {
                 manager(sender,claim,admin);
                 messages().send(sender,"commands.trust-source","source",messages().text("labels.local")); showTrust(sender,claim);
-                if (!claim.root()) {
-                    messages().send(sender,"commands.inherit-trust","enabled",onOff(claim.inheritTrust()));
-                    if(claim.inheritTrust()) { messages().send(sender,"commands.trust-source","source",messages().text("labels.inherited")); showTrust(sender,plugin.state().root(claim)); }
-                }
                 return true;
-            }
-            if (path.equals("child.restrict")) {
-                owner(sender,plugin.state(),claim,false); if(claim.root()) throw new MessageException("errors.child-required");
-                boolean restricted=toggle(arg(a,2,"/claim child restrict <on|off>"));
-                plugin.mutate(sender,s->ClaimService.replace(s,claim.change(claim.bounds(),!restricted,claim.trust(),claim.flags())),Notice.of("success.restricted","enabled",onOff(!restricted),"id",claim.id())); return true;
             }
         } catch (IllegalArgumentException|ArithmeticException e) { if(selectionAction) clearFailedSelection(sender); messages().sendError(sender,e); }
         catch (Exception e) { if(selectionAction) clearFailedSelection(sender); plugin.getLogger().log(java.util.logging.Level.SEVERE,"Command failure",e); messages().send(sender,"errors.action-failed"); }
@@ -215,7 +207,7 @@ public final class ClaimCommands implements CommandExecutor, TabCompleter, Liste
             case "info" -> " [owner]";
             case "inspect","delete","trustlist" -> admin?" <owner>":"";
             case "resize" -> admin?" <owner> [minX minZ maxX maxZ [minY maxY]]":"";
-            case "bypass","child.restrict" -> " <on|off>";
+            case "bypass" -> " <on|off>";
             case "balance.show" -> " <player>";
             case "balance.set","balance.add","balance.remove" -> " <player> <amount>";
             default -> "";
@@ -231,7 +223,7 @@ public final class ClaimCommands implements CommandExecutor, TabCompleter, Liste
             contextual=plugin.state().require(plugin.selections().session(p).resize);
         return ClaimTargets.select(plugin.state(),owner,contextual,at!=null,root);
     }
-    /** Tool completion calls the same validation/transaction path as explicit create/resize commands. */
+    /** Tool completion validates and persists geometry; only staff have an explicit resize command. */
     public void commitSelection(Player player) {
         if(!plugin.ready()) throw new MessageException("errors.maintenance");
         Session selected=plugin.selections().session(player);
@@ -314,14 +306,9 @@ public final class ClaimCommands implements CommandExecutor, TabCompleter, Liste
         if(admin||sender instanceof Player p&&plugin.state().trust(claim,p.getUniqueId()).grants(Trust.MANAGE)) {
             messages().send(sender,"commands.trust-owner","owner",plugin.playerName(plugin.state().owner(claim)));
             messages().send(sender,"commands.trust-source","source",messages().text("labels.local")); showTrust(sender,claim);
-            if(!claim.root()) {
-                messages().send(sender,"commands.inherit-trust","enabled",onOff(claim.inheritTrust()));
-                if(claim.inheritTrust()) { messages().send(sender,"commands.trust-source","source",messages().text("labels.inherited")); showTrust(sender,plugin.state().root(claim)); }
-            }
         }
         if(admin) {
             messages().send(sender,"commands.local-flags","flags",claim.flags());
-            if(!claim.root()) messages().send(sender,"commands.root-flags","flags",plugin.state().root(claim).flags());
         }
     }
     private static String identity(CommandSender sender) { return sender instanceof Player p?p.getUniqueId().toString():"console:"+sender.getName(); }

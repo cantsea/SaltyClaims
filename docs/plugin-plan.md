@@ -64,11 +64,11 @@ Support exactly one subdivision level: root -> child. A child cannot be a parent
 
 ### Trust inheritance
 
-New children default to restricted trust. Only the parent owner and the parent manager who created the child (if applicable, with a local Manage grant) retain access. Existing children keep their saved inheritance setting. If the owner enables inheritance, effective trust is the highest applicable grant among child, inherited root, and public grants. A weaker child grant does not reduce a stronger inherited grant.
+Children never inherit parent trust or flags, including existing children. Only the parent owner and the creating parent manager (if applicable, through a local Manage grant) retain access until local trust is assigned. Child flags use configured defaults or local overrides. Creation is tool-only; there is no child create/restrict command.
 
-A restricted child stops inheriting root trust grants, including root public grants. Local grants and local public trust still apply. The root owner and authorized staff remain able to manage it. Trust restriction does not reset flag inheritance.
+Local grants and local public trust apply only to their selected claim. The parent owner retains ownership and staff authority remains separate.
 
-Untrust removes a local grant only. If inherited or public access remains, the command must explain its source and suggest restricting the child when appropriate. Do not introduce hidden per-player deny entries in the first version.
+Untrust removes a local grant only. Local public access can still apply after removing a named grant. Do not introduce hidden per-player deny entries in the first version.
 
 ## 3. Trust levels
 
@@ -93,7 +93,7 @@ Permission nodes gate use of plugin features. They do not confer trust in arbitr
 
 ### Flag model
 
-Each flag definition contains a stable key, typed value, description, default, edit permission, actor/event classification, and validation. Explicit overrides live on roots or children; absence means inheritance. Commands expose effective value and its source.
+Each flag definition contains a stable key, typed value, description, default, edit permission, actor/event classification, and validation. Explicit overrides live on roots or children; absence means the configured claim default. Commands expose effective value and its source.
 
 Use two value families:
 
@@ -120,7 +120,7 @@ These are proposed defaults. Explosion entity damage, hostile mobs, vehicle ridi
 
 ### Precedence and authority
 
-Current flag resolution: locked claim default; otherwise child override -> root override -> claim default. Wilderness uses independent per-world booleans from worlds.yml, including when claiming is disabled. Missing child flags inherit root values even when child trust is restricted. All player flag edits use boolean toggles; trust thresholds are fixed.
+Current flag resolution: locked claim default; otherwise local override -> claim default. Wilderness uses independent per-world booleans from worlds.yml, including when claiming is disabled. Missing child flags use configured claim defaults, never parent overrides. All player flag edits use boolean toggles; trust thresholds are fixed.
 
 Editing requires both claim ownership/staff authority and the flag's permission node. Manage trust alone cannot edit flags. Metadata management is independent of action flags, so an owner can fix a `deny` flag without being locked out of the command.
 
@@ -185,7 +185,7 @@ Configuration reload validates a replacement configuration before applying it. U
 2. **Durable root claims:** schema, migrations, memory index, selection, create/resize/delete/list/inspect, proposed allowance model once chosen. Acceptance: correct negative-coordinate/boundary behavior, overlap and concurrent-budget rejection, persistence after restart, failed writes preserve state.
 3. **Trust and core protection:** four assignable roles, public subject, delegation, shared authorization, basic block/inventory/entity protection. Acceptance: complete trust matrix, no privilege escalation, owner and staff rules verified.
 4. **Native flags and protection coverage:** registry, defaults/locks, edit/explain commands, environmental/boundary adapters. Acceptance: flag precedence tests, multi-location attack tests, tracked event coverage and real-server two-player checks. Root-only release can ship after this milestone is hardened.
-5. **Child claims:** full-height and 3D selection, child lookup, stacked siblings, inheritance/restriction, root mutation safeguards. Acceptance: upstairs/downstairs isolation, inherited trust explanations, transactional tree deletion, cross-child automation tests.
+5. **Child claims:** full-height and 3D tool selection, child lookup, stacked siblings, independent trust/flags, root mutation safeguards. Acceptance: upstairs/downstairs isolation, transactional tree deletion, cross-child automation tests.
 6. **Release hardening:** consistent backup/restore, migration recovery, load failure handling, large-dataset lookup/heap measurements, bounded queue/load testing, documentation and release packaging.
 
 Benchmark representative claim counts and distributions, including a large root and many stacked children. Record lookup latency, tick impact, startup time, and heap rather than asserting a performance target without measurements.

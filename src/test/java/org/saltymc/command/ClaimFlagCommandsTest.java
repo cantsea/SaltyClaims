@@ -87,13 +87,13 @@ class ClaimFlagCommandsTest {
             assertTrue(h.messages.stream().noneMatch(m->m.contains("pvp:")));
         }
     }
-    @Test void childToggleUsesInheritedValueAndOnlyChangesChild() {
+    @Test void childToggleUsesConfiguredDefaultAndOnlyChangesChild() {
         Harness h=new Harness();
         Claim parent=h.root.change(h.root.bounds(),true,Map.of(),Map.of(Flag.PVP,"true"));
         Claim child=child(parent,10,20); h.state=state(parent,child);
         h.run("claimflag","toggle","pvp");
         assertEquals("true",h.state.require(parent.id()).flags().get(Flag.PVP));
-        assertEquals("false",h.state.require(child.id()).flags().get(Flag.PVP));
+        assertEquals("true",h.state.require(child.id()).flags().get(Flag.PVP));
     }
     @Test void independentCommandPermissionsAreEnforced() {
         Harness h=new Harness(); h.permissions.remove(ClaimFlagCommands.TOGGLE);

@@ -45,15 +45,28 @@ class CommandPermissionsTest {
     }
     @Test void bareRootUsesHelpPermissionWithoutACommonGate() {
         List<String> messages=new ArrayList<>();
-        new ClaimCommands(null).onCommand(sender(Set.of("saltyclaims.command.claim.help","saltyclaims.command.claim.resize"),messages),command("claim"),"claim",new String[]{});
-        assertTrue(messages.contains("[SaltyClaims] /claim resize")); assertFalse(messages.contains("[SaltyClaims] /claim delete"));
+        new ClaimCommands(null).onCommand(sender(Set.of("saltyclaims.command.claim.help","saltyclaims.command.claim.info"),messages),command("claim"),"claim",new String[]{});
+        assertTrue(messages.contains("[SaltyClaims] /claim info [owner]")); assertFalse(messages.contains("[SaltyClaims] /claim delete"));
     }
-    @Test void nestedCommandsAndSuggestionsAreFilteredIndividually() {
+    @Test void playerResizeCommandIsRemovedButToolPermissionDoesNotAdvertiseIt() {
         ClaimCommands commands=new ClaimCommands(null); List<String> messages=new ArrayList<>();
-        CommandSender sender=sender(Set.of("saltyclaims.command.claim.child.create"),messages);
-        assertEquals(List.of("create"),commands.onTabComplete(sender,command("claim"),"claim",new String[]{"child",""}));
-        commands.onCommand(sender,command("claim"),"claim",new String[]{"child","restrict","on"});
-        assertEquals(List.of("[SaltyClaims] You do not have permission to do that."),messages);
+        CommandSender sender=sender(Set.of("saltyclaims.command.claim.resize","saltyclaims.command.claim.help"),messages);
+        commands.onCommand(sender,command("claim"),"claim",new String[]{"resize"});
+        assertEquals(List.of("[SaltyClaims] Unknown command. Use /claim help."),messages);
+        assertTrue(commands.onTabComplete(sender,command("claim"),"claim",new String[]{"res"}).isEmpty());
+        messages.clear(); commands.onCommand(sender,command("claim"),"claim",new String[]{"help"});
+        assertTrue(messages.stream().noneMatch(line->line.contains("/claim resize")));
+        assertTrue(ClaimCommands.ADMIN_PATHS.contains("resize"));
+    }
+    @Test void childCreationAndRestrictionCommandsAreUnavailableEvenWithFormerPermissions() {
+        ClaimCommands commands=new ClaimCommands(null); List<String> messages=new ArrayList<>();
+        CommandSender sender=sender(Set.of("saltyclaims.command.claim.child.create","saltyclaims.command.claim.child.restrict","saltyclaims.command.claim.help"),messages);
+        assertTrue(commands.onTabComplete(sender,command("claim"),"claim",new String[]{"child",""}).isEmpty());
+        for(String[] args:List.of(new String[]{"child","create"},new String[]{"child","restrict","off"}))
+            commands.onCommand(sender,command("claim"),"claim",args);
+        assertEquals(Collections.nCopies(2,"[SaltyClaims] Unknown command. Use /claim help."),messages);
+        messages.clear(); commands.onCommand(sender,command("claim"),"claim",new String[]{"help"});
+        assertTrue(messages.stream().noneMatch(line->line.contains("/claim child")));
     }
     @Test void playerDeleteRoutesAreRemoved() {
         List<String> messages=new ArrayList<>(); ClaimCommands commands=new ClaimCommands(null);

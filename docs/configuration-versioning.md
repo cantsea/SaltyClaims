@@ -2,7 +2,7 @@
 
 ## Independent versions
 
-The editable file registry is `config.ConfigFiles`. It currently manages `config.yml`, `worlds.yml`, and `messages.yml`, each with its own positive integer `config-version` as the last setting. Current versions are 7 for `config.yml`, 1 for `worlds.yml`, and 13 for `messages.yml`. These versions are independent of each other, the plugin release (`1.0-SNAPSHOT`), and SQLite's schema version. `plugin.yml` is packaged plugin metadata, not a runtime-editable settings file.
+The editable file registry is `config.ConfigFiles`. It currently manages `config.yml`, `worlds.yml`, and `messages.yml`, each with its own positive integer `config-version` as the last setting. Current versions are 8 for `config.yml`, 1 for `worlds.yml`, and 13 for `messages.yml`. These versions are independent of each other, the plugin release (`1.0-SNAPSHOT`), and SQLite's schema version. `plugin.yml` is packaged plugin metadata, not a runtime-editable settings file.
 
 Missing files are created from the current bundled resource after the whole bundle passes validation. Existing blank/comment-only files or mappings without `config-version` are legacy version 0. Explicit zero, negative, fractional, quoted, boolean, null, out-of-range, or future versions are rejected without overwriting supplied files. Do not manually change version numbers to bypass migrations or downgrade.
 
@@ -17,6 +17,7 @@ Missing files are created from the current bundled resource after the whole bund
 | `config.yml` | 4 -> 5 | Every configured value, including tool choices, flags and worlds | Bundled comments documenting every flag/default and cumulative trust access | None; no renamed, removed, or intentionally replaced settings |
 | `config.yml` | 5 -> 6 | All existing settings, including valid supplied color values | `border-colors.parent` (yellow `#FFFF00`) and `border-colors.child` (cyan `#00FFFF`), strictly validated quoted six-digit hex strings | None; no renamed, removed, or intentionally replaced values |
 | `config.yml` | 6 -> 7 | Limits, tools, colors, explicit world behavior and existing claiming availability | Boolean claim-flags defaults/editability, independent worlds.yml | Remove flags.defaults, flags.enforced, worlds and disabled-worlds. Convert deny to false and other legacy values to true; action trust thresholds become fixed. Enforced values become locked claim defaults. Exact source backups precede writes; worlds save before config removal. |
+| `config.yml` | 7 -> 8 | All configured values | Refreshed comments for independent child trust/flags | No values changed; child trust normalization occurs on claim load, and parent flags are no longer consulted. |
 | `worlds.yml` | 0 -> 1 | Supplied world entries and booleans | Complete flags and loaded world entries, all true; claiming false | Import legacy explicit world/global/enforced wilderness values once; explicit new world entries win. |
 | `messages.yml` | 12 -> 13 | Custom templates and prefix | No-editable-flags and flag-lock messages | Update only stock flag-unknown command guidance and stock action-denied wording; remove obsolete flag-enforced message. |
 | `messages.yml` | 0 -> 1 | Supplied valid prefix and message templates | Independent metadata and missing current messages | None |

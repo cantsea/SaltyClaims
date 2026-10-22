@@ -15,6 +15,8 @@ public record Claim(UUID id, UUID world, UUID owner, UUID parent, Bounds bounds,
         if ((parent == null) != (owner != null)) throw new MessageException("errors.root-owner");
         if (parent == null && !bounds.fullHeight()) throw new MessageException("errors.root-height");
         if (id.equals(parent)) throw new MessageException("errors.self-parent");
+        // Legacy storage may enable inheritance; children always use local grants now.
+        if (parent != null) inheritTrust = false;
         trust = Map.copyOf(trust);
         Map<Flag,String> normalized = new EnumMap<>(Flag.class);
         flags.forEach((flag,value) -> normalized.put(flag,flag.validate(value))); flags = Map.copyOf(normalized);

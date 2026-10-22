@@ -6,7 +6,7 @@ The command replies when finished with a log path under `plugins/SaltyClaims/tes
 
 ## What it measures
 
-- Generated grids of 100, 1,000 and 10,000 main claims, with a 3D child on every fourth main claim and a mixture of inherited/restricted trust.
+- Generated grids of 100, 1,000 and 10,000 main claims, with a 3D child on every fourth main claim and independent child trust.
 - A grid of 1,000 larger 128 x 128 claims to exercise index coverage across multiple chunks.
 - One main claim with 100 stacked 3D child claims in the same chunk.
 - Index rebuilds, mixed hit/miss/boundary/child lookups, and lookup plus trust/flag policy checks.

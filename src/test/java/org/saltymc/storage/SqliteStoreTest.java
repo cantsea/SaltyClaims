@@ -13,6 +13,20 @@ import static org.saltymc.Fixtures.*;
 
 class SqliteStoreTest {
     @TempDir Path directory;
+    @Test void legacyChildrenCannotInheritTrustAfterRestart() throws Exception {
+        Path db=directory.resolve("claims.db"); Claim root=root(0,9);
+        root=root.change(root.bounds(),true,Map.of(new Subject(FRIEND),Trust.MANAGE,Subject.PUBLIC,Trust.BUILD),Map.of());
+        Claim child=child(root,1,5);
+        try(SqliteStore store=new SqliteStore(db)) { store.save(ClaimState.empty(),state(root,child)); }
+        try(Connection connection=DriverManager.getConnection("jdbc:sqlite:"+db); Statement statement=connection.createStatement()) {
+            statement.executeUpdate("UPDATE claims SET inherit_trust=1 WHERE parent IS NOT NULL");
+        }
+        try(SqliteStore reopened=new SqliteStore(db)) {
+            ClaimState loaded=reopened.load(); Claim saved=loaded.require(child.id());
+            assertFalse(saved.inheritTrust()); assertEquals(Trust.VISITOR,loaded.trust(saved,FRIEND));
+            assertEquals(Trust.VISITOR,loaded.trust(saved,STRANGER)); assertEquals(Trust.OWNER,loaded.trust(saved,OWNER));
+        }
+    }
     @Test void booleanFlagOverridesPersistAlongsideLegacyFlagsAcrossRestart() throws Exception {
         Path db=directory.resolve("claims.db"); Claim root=root(0,9);
         root=root.change(root.bounds(),true,Map.of(),Map.of(Flag.PVP,"true",Flag.BLOCK_BREAK,"false",Flag.CONTAINER_USE,"container"));

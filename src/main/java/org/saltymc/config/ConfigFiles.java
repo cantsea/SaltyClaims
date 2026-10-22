@@ -26,7 +26,8 @@ public final class ConfigFiles {
                 new MigrationStep(4,"Convert former stock tool set to stick, bone and feather; preserve customized sets",ToolMigrationV4::apply),
                 new MigrationStep(5,"Add full flag and trust reference comments; preserve configured values",document->{}),
                 new MigrationStep(6,"Add configurable parent and child border colors; preserve supplied settings",document->{}),
-                new MigrationStep(7,"Replace typed flag policy with boolean claim defaults and editability",FlagMigrationV7::apply)
+                new MigrationStep(7,"Replace typed flag policy with boolean claim defaults and editability",FlagMigrationV7::apply),
+                new MigrationStep(8,"Document independent child trust and flags; preserve configured defaults",document->{})
         ),Set.of("claim-flags"),Settings::from,Settings::completeFlags);
     }
     public static YamlFileSpec worldsFile(Supplier<Collection<String>> names) {

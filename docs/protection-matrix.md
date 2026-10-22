@@ -39,7 +39,7 @@ Unclassified right-click block interactions require block-place authority. This 
 ## Live acceptance checklist
 
 - Two players with every trust level; owner and manager delegation; permission changes while menus are open.
-- Full-height roots; stacked children; shared X/Z but separated Y; child restriction versus flag inheritance.
+- Full-height roots; stacked children; shared X/Z but separated Y; independent child trust and flag defaults.
 - Cross-boundary sticky-piston pulls, slime/honey movement, destroyed blocks, fluid flow, dispenser actions, and hopper minecarts.
 - Ranged damage from outside claims, offline projectile owners, lingering potions, tamed pets, explosions, and armor stands/item frames.
 - Double containers, multi-block placement, farmland, lecterns, signs, new-version entities/blocks, and interactions from both hands.

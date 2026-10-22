@@ -25,14 +25,16 @@ class PolicyTest {
         assertFalse(Policy.check(s,null,STRANGER,Flag.BLOCK_BREAK,wilderness,false).allowed());
         assertFalse(world.claiming());
     }
-    @Test void childOverridesParentAndWildernessNeverChangesClaims() {
+    @Test void childUsesDefaultsInsteadOfParentOverridesAndCanSetItsOwnFlags() {
         Claim root=root(0,9); root=root.change(root.bounds(),true,Map.of(),Map.of(Flag.PVP,"true")); Claim child=child(root,1,5);
         ClaimState s=state(root,child);
-        assertEquals("allow",value(s,child,Flag.PVP).value());
-        assertEquals("deny",Policy.resolve(s,null,Flag.PVP,"world",editableDefaults(),Map.of("world",new WorldSettings(false,Map.of(Flag.PVP,false)))).value());
-        child=child.change(child.bounds(),false,Map.of(),Map.of(Flag.PVP,"false")); s=state(root,child);
-        assertEquals("child override",value(s,child,Flag.PVP).source());
+        assertEquals("allow",value(s,root,Flag.PVP).value());
         assertEquals("deny",value(s,child,Flag.PVP).value());
+        assertEquals("claim default",value(s,child,Flag.PVP).source());
+        assertEquals("deny",Policy.resolve(s,null,Flag.PVP,"world",editableDefaults(),Map.of("world",new WorldSettings(false,Map.of(Flag.PVP,false)))).value());
+        child=child.change(child.bounds(),false,Map.of(),Map.of(Flag.PVP,"true")); s=state(root,child);
+        assertEquals("child override",value(s,child,Flag.PVP).source());
+        assertEquals("allow",value(s,child,Flag.PVP).value());
     }
     @Test void lockedDefaultsOverrideSavedRootAndChildFlags() {
         Claim root=root(0,9); root=root.change(root.bounds(),true,Map.of(),Map.of(Flag.PVP,"allow"));
@@ -42,10 +44,13 @@ class PolicyTest {
             assertEquals("deny",v.value()); assertEquals("locked claim default",v.source());
         }
     }
-    @Test void restrictingTrustDoesNotResetFlags() {
+    @Test void childUsesConfiguredDefaultEvenWhenParentDisablesBehavior() {
         Claim root=root(0,9); root=root.change(root.bounds(),true,Map.of(),Map.of(Flag.PVP,"allow"));
         Claim child=child(root,1,5); child=child.change(child.bounds(),false,Map.of(),Map.of());
-        assertEquals("allow",value(state(root,child),child,Flag.PVP).value());
+        assertEquals("deny",value(state(root,child),child,Flag.PVP).value());
+        var enabled=Map.of(Flag.PVP,new Settings.ClaimFlag(true,true));
+        root=root.change(root.bounds(),true,Map.of(),Map.of(Flag.PVP,"false"));
+        assertEquals("allow",Policy.resolve(state(root,child),child,Flag.PVP,"world",enabled,Map.of()).value());
     }
     @Test void disabledActionBlocksOwnerAndStaffBypassStillWorks() {
         Claim root=root(0,9); root=root.change(root.bounds(),true,Map.of(),Map.of(Flag.BLOCK_PLACE,"false"));

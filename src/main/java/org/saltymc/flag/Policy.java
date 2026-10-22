@@ -19,8 +19,6 @@ public final class Policy {
         Settings.ClaimFlag setting=defaults.getOrDefault(flag,new Settings.ClaimFlag(flag.actor(),false));
         if(setting.playerEditable()) {
             if(c.flags().containsKey(flag)) return new Value(flag.behavior(flag.enabled(c.flags().get(flag)),false),c.root()?"root override":"child override");
-            Claim root=state.root(c);
-            if(!c.root()&&root.flags().containsKey(flag)) return new Value(flag.behavior(flag.enabled(root.flags().get(flag)),false),"root override");
         }
         return new Value(flag.behavior(setting.defaultValue(),false),setting.playerEditable()?"claim default":"locked claim default");
     }
