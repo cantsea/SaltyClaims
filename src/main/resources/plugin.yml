@@ -1,0 +1,8 @@
+name: SaltyClaims
+version: '${version}'
+
+main: org.saltymc.SaltyClaims
+api-version: '26.3'
+load: POSTWORLD
+
+authors: [ cantsea ]
