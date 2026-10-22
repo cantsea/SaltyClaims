@@ -21,8 +21,8 @@ import java.util.*;
 
 /** All executable paths are independently permission-gated; roots have no blanket gate. */
 public final class ClaimCommands implements CommandExecutor, TabCompleter, Listener {
-    public static final List<String> PLAYER_PATHS = List.of("help", "cancel", "info", "list",
-            "trust", "untrust", "trustlist");
+    public static final List<String> PLAYER_PATHS = List.of("help", "info", "list",
+            "trustlist");
     public static final List<String> ADMIN_PATHS = List.of("help", "inspect", "bypass", "delete", "resize", "trust", "untrust", "trustlist",
             "balance.show", "balance.set", "balance.add", "balance.remove", "reload", "backup", "test", "delete.confirm", "reset.all", "reset.all.confirm");
     private final SaltyClaims plugin;
@@ -38,6 +38,7 @@ public final class ClaimCommands implements CommandExecutor, TabCompleter, Liste
     @EventHandler public void quit(PlayerQuitEvent event) { confirmations.clear(identity(event.getPlayer())); }
     public static String permission(boolean admin, String path) { return "saltyclaims.command." + (admin?"claima.":"claim.") + path; }
     public static String unclaimPermission(boolean all) { return "saltyclaims.command.unclaim"+(all?".all":""); }
+    public static String trustPermission(boolean remove) { return "saltyclaims.command."+(remove?"untrust":"trust"); }
     public void registerPermissions() {
         for (boolean admin : List.of(false,true)) for (String path : admin?ADMIN_PATHS:PLAYER_PATHS)
             register(permission(admin,path), admin?PermissionDefault.OP:PermissionDefault.TRUE);
@@ -47,6 +48,8 @@ public final class ClaimCommands implements CommandExecutor, TabCompleter, Liste
         register(permission(false,"resize"),PermissionDefault.TRUE);
         register(unclaimPermission(false),PermissionDefault.TRUE);
         register(unclaimPermission(true),PermissionDefault.TRUE);
+        register(trustPermission(false),PermissionDefault.TRUE);
+        register(trustPermission(true),PermissionDefault.TRUE);
         register(ClaimFlagCommands.LIST,PermissionDefault.TRUE);
         register(ClaimFlagCommands.TOGGLE,PermissionDefault.TRUE);
         for (Flag flag : Flag.values()) register("saltyclaims.flag." + flag.key(),PermissionDefault.TRUE);
@@ -85,10 +88,12 @@ public final class ClaimCommands implements CommandExecutor, TabCompleter, Liste
     @Override public boolean onCommand(CommandSender sender, Command command, String label, String[] raw) {
         if(Set.of("claimflag","claimflags").contains(command.getName().toLowerCase(Locale.ROOT))) return flagCommands.onCommand(sender,command,label,raw);
         boolean admin = command.getName().equalsIgnoreCase("claima");
+        boolean standaloneTrust=Set.of("trust","untrust").contains(command.getName().toLowerCase(Locale.ROOT));
         boolean selectionAction=false;
         try {
             if(command.getName().equalsIgnoreCase("unclaim")) { unclaim(sender,raw); return true; }
             List<String> a = new ArrayList<>(Arrays.asList(raw));
+            if(standaloneTrust) a.addFirst(command.getName().toLowerCase(Locale.ROOT));
             String explicit = null; Location explicitLocation=null; boolean rootScope = false;
             for (int i=0;i<a.size();) {
                 if (a.get(i).equalsIgnoreCase("--root")) { rootScope=true; a.remove(i); }
@@ -107,20 +112,23 @@ public final class ClaimCommands implements CommandExecutor, TabCompleter, Liste
             if (Set.of("balance","reset").contains(path)) path += "." + arg(a,1,"/"+label+" "+path+" <subcommand>").toLowerCase(Locale.ROOT);
             if(path.equals("reset.all")&&a.size()>2&&a.get(2).equalsIgnoreCase("confirm")) path="reset.all.confirm";
             if(path.equals("delete")&&explicit==null&&a.size()>1&&a.get(1).equalsIgnoreCase("confirm")) path="delete.confirm";
-            if (!(admin?ADMIN_PATHS:PLAYER_PATHS).contains(path)) throw new MessageException("errors.unknown-command","command",label);
+            if (!standaloneTrust && !(admin?ADMIN_PATHS:PLAYER_PATHS).contains(path)) throw new MessageException("errors.unknown-command","command",label);
             selectionAction=path.equals("resize");
-            String node = permission(admin,path); require(sender,node);
+            String node = standaloneTrust?trustPermission(path.equals("untrust")):permission(admin,path); require(sender,node);
             if (path.equals("help")) {
                 if(!admin) {
                     Settings settings=plugin!=null&&plugin.ready()?plugin.settings():Settings.from(YamlData.parse(ConfigFiles.resource("config.yml"),"bundled config"));
                     messages().send(sender,helpTools(settings));
                     messages().send(sender,"commands.help-player");
+                    messages().send(sender,"commands.help-trust");
                     messages().send(sender,"commands.help-commands");
                 }
                 for (String route : admin?ADMIN_PATHS:PLAYER_PATHS) if (sender.hasPermission(permission(admin,route))) messages().send(sender,"commands.help-line","usage",usage(admin,route));
                 if(!admin) for(boolean all:List.of(false,true)) if(sender.hasPermission(unclaimPermission(all)))
                     messages().send(sender,"commands.help-line","usage",all?"/unclaim all":"/unclaim");
                 if(!admin) {
+                    if(sender.hasPermission(trustPermission(false))) messages().send(sender,"commands.help-line","usage","/trust <player|public> [access|container|build|manage]");
+                    if(sender.hasPermission(trustPermission(true))) messages().send(sender,"commands.help-line","usage","/untrust <player|public|all>");
                     if(sender.hasPermission(ClaimFlagCommands.LIST)) messages().send(sender,"commands.help-line","usage","/claimflags");
                     if(sender.hasPermission(ClaimFlagCommands.TOGGLE)) messages().send(sender,"commands.help-line","usage","/claimflag toggle [flag]");
                 }
@@ -152,7 +160,6 @@ public final class ClaimCommands implements CommandExecutor, TabCompleter, Liste
                 if(a.size()!=2||rootScope||explicitLocation!=null) throw new MessageException("errors.usage","usage","/"+label+" delete confirm");
                 confirm(sender,admin); return true;
             }
-            if (path.equals("cancel")) { plugin.selections().cancel(player(sender)); confirmations.clear(identity(sender)); messages().send(sender,"commands.cancelled"); return true; }
             if (path.startsWith("balance.")) { balance(sender,a,path.substring(8)); return true; }
             if (path.equals("list")) {
                 UUID who=player(sender).getUniqueId();
@@ -277,10 +284,13 @@ public final class ClaimCommands implements CommandExecutor, TabCompleter, Liste
         manager(sender,claim,admin); int offset=admin?2:1; String target=arg(args,offset,"Provide a player name or public.");
         boolean all=remove&&target.equalsIgnoreCase("all");
         Subject subject=all||target.equalsIgnoreCase("public")?Subject.PUBLIC:new Subject(resolvePlayer(target));
-        Trust level=remove?null:Trust.parse(args.size()>offset+1?args.get(offset+1):"build");
+        Trust level=remove?null:trustLevel(args,offset+1);
         Map<Subject,Trust> grants=TrustRules.edit(plugin.state(),claim,sender instanceof Player p?p.getUniqueId():null,admin,subject,level,remove,all);
         plugin.mutate(sender,s->ClaimService.replace(s,claim.change(claim.bounds(),claim.inheritTrust(),grants,claim.flags())),
                 Notice.of("success.trust","id",claim.id()));
+    }
+    static Trust trustLevel(List<String> args,int index) {
+        return args.size()>index?Trust.parse(args.get(index)):Trust.ACCESS;
     }
     private void showTrust(CommandSender sender, Claim claim) {
         String grants=claim.trust().entrySet().stream().map(entry->(entry.getKey().isPublic()?messages().text("labels.public"):plugin.playerName(entry.getKey().playerId()))+": "+entry.getValue().key()).sorted().collect(java.util.stream.Collectors.joining(", "));
@@ -335,6 +345,12 @@ public final class ClaimCommands implements CommandExecutor, TabCompleter, Liste
         if(Set.of("claimflag","claimflags").contains(command.getName().toLowerCase(Locale.ROOT))) return flagCommands.onTabComplete(sender,command,label,args);
         if(command.getName().equalsIgnoreCase("unclaim"))
             return args.length==1&&sender.hasPermission(unclaimPermission(true))&&"all".startsWith(args[0].toLowerCase(Locale.ROOT))?List.of("all"):List.of();
+        boolean standaloneTrust=Set.of("trust","untrust").contains(command.getName().toLowerCase(Locale.ROOT));
+        if(standaloneTrust) {
+            if(!sender.hasPermission(trustPermission(command.getName().equalsIgnoreCase("untrust")))) return List.of();
+            List<String> normalized=new ArrayList<>(List.of(args)); normalized.addFirst(command.getName().toLowerCase(Locale.ROOT));
+            args=normalized.toArray(String[]::new);
+        }
         boolean admin=command.getName().equalsIgnoreCase("claima"); List<String> paths=admin?ADMIN_PATHS:PLAYER_PATHS;
         String prefix=args.length==0?"":args[args.length-1].toLowerCase(Locale.ROOT);
         List<String> options=new ArrayList<>();
@@ -342,15 +358,17 @@ public final class ClaimCommands implements CommandExecutor, TabCompleter, Liste
         for(String path:paths) if(sender.hasPermission(permission(admin,path))&&path.startsWith(head)) {
             String remainder=path.substring(head.length()); options.add(remainder.split("\\.")[0]);
         }
-        if(!admin&&args.length==3&&args[0].equals("trust")&&sender.hasPermission(permission(false,"trust"))) options.addAll(List.of("access","container","build","manage"));
+        if(standaloneTrust&&args.length==3&&args[0].equals("trust")) options.addAll(List.of("access","container","build","manage"));
         if(plugin!=null&&args.length>1) {
             String action=args[0].toLowerCase(Locale.ROOT);
-            boolean allowed=sender.hasPermission(permission(admin,action));
+            boolean allowed=sender.hasPermission(standaloneTrust?trustPermission(action.equals("untrust")):permission(admin,action));
             boolean ownerArgument=args.length==2&&(admin&&Set.of("inspect","resize","delete","trust","untrust","trustlist").contains(action)||!admin&&action.equals("info"));
-            boolean trustArgument=Set.of("trust","untrust").contains(action)&&args.length==(admin?3:2);
+            boolean trustArgument=(admin||standaloneTrust)&&Set.of("trust","untrust").contains(action)&&args.length==(admin?3:2);
             if(allowed&&(ownerArgument||trustArgument||args[args.length-2].equals("--owner"))) {
-                Bukkit.getOnlinePlayers().forEach(player->options.add(player.getName()));
-                plugin.state().claims().values().stream().filter(Claim::root).map(Claim::owner).distinct().map(plugin::playerName).filter(HumanNames::validPlayerName).forEach(options::add);
+                boolean omitSelf=trustArgument;
+                Bukkit.getOnlinePlayers().stream().filter(p->!omitSelf||!p.getName().equalsIgnoreCase(sender.getName())).forEach(p->options.add(p.getName()));
+                plugin.state().claims().values().stream().filter(Claim::root).map(Claim::owner).distinct().map(plugin::playerName).filter(HumanNames::validPlayerName)
+                        .filter(name->!omitSelf||!name.equalsIgnoreCase(sender.getName())).forEach(options::add);
                 if(trustArgument) { options.add("public"); if(action.startsWith("untrust")) options.add("all"); }
             }
         }

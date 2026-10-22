@@ -17,6 +17,15 @@ commands:
     Switching away or a failed attempt clears your selection.
     Stand in a claim to use trust and management commands.
   help-commands: 'Commands:'
+  help-trust: |-
+    Each higher trust level includes the lower levels:
+    Visitor (untrusted): walk through claims; no protected interactions.
+    Access (default): doors, switches, beds and riding vehicles.
+    Container: Access plus chests, workstations, crops and animal interaction.
+    Build: Container plus placing/breaking blocks, buckets and editing entities.
+    Manage: Build plus managing lower trust levels and creating child claims.
+    Owner: full claim management, including flags, resizing and assigning managers.
+    Claim flags can disable these actions. You cannot trust or untrust yourself.
   reloaded: 'Settings reloaded.'
   bypass: 'Claim bypass: {enabled}.'
   cancelled: 'Selection cancelled.'
@@ -91,6 +100,7 @@ labels:
   full-height: 'full height'
   claim-reference: '{owner} at {x}, {z} ({world})'
 errors:
+  self-trust: 'You cannot trust or untrust yourself in a claim you own or manage.'
   flag-locked: 'You do not have permission to edit that flag.'
   test-busy: 'A claim test is already running.'
   test-failed: 'A claim test failed. Report: {file}'
@@ -164,4 +174,4 @@ errors:
   invalid-input: '{reason}'
 
 # Independent message-file schema version. Managed automatically; do not edit.
-config-version: 13
+config-version: 14

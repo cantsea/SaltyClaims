@@ -23,3 +23,9 @@ commands:
   claimflags:
     description: List the claim flags you can edit here.
     usage: /claimflags
+  trust:
+    description: Grant claim trust to a player or everyone; defaults to Access.
+    usage: /trust <player|public> [access|container|build|manage]
+  untrust:
+    description: Remove local claim trust from a player or everyone.
+    usage: /untrust <player|public|all>

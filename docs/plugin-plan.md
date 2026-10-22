@@ -34,7 +34,7 @@ The upstream documentation describes ongoing v17+ changes. These are references 
 - Select opposite corners with the tool; the second click immediately attempts a validated claim and shows borders/cost. Rejection clears the selection; start again with two corners. Clicking an existing owned corner enters resize mode, and its next click attempts the resize.
 - Inspection reports claim ID, owner, root/child context, and effective access, with temporary client-side boundary visuals. It never changes real blocks.
 - Commands provide alternatives for selecting corners, creating, resizing, inspecting, listing, and deleting claims.
-- Sessions are per player; cancel or expire on disconnect, world change, explicit cancellation, or timeout. Pending sessions are not persistent claims.
+- Sessions are per player; clear on switching away from a selection tool, disconnect or world change, or expire after inactivity. Pending sessions are not persistent claims. There is no player cancel command.
 - Creation and resizing validate world availability, world border, configured world rules, dimensions, area budget, claim count, and overlaps, including reserved pending changes.
 - Root claims cannot share any block. Adjacent rectangles are valid when their inclusive bounds do not intersect. Optional minimum spacing is configurable.
 - Players can walk into claims by default. Access trust controls interactions, not physical entry. Entry bans are outside the initial scope.

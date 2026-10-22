@@ -56,7 +56,8 @@ public final class ConfigFiles {
                     Map<String,Object> protection=FlagMigrationV7.section(document,"protection");
                     if("You cannot do that in this claim.".equals(protection.get("action-denied")))
                         protection.put("action-denied","You cannot do that here.");
-                })
+                }),
+                new MigrationStep(14,"Add trust-level help and self-trust rejection; preserve existing templates",document->{})
         ),Set.of(),Messages::from);
     }
     public static ConfigurationPipeline<RuntimeConfiguration> pipeline(Path directory,Consumer<String> logger) {

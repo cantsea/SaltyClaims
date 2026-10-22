@@ -64,7 +64,7 @@ public final class SaltyClaims extends JavaPlugin implements Listener,SelectionM
         ClaimCommands commands = new ClaimCommands(this);
         selections = new SelectionManager(this,commands::commitSelection);
         commands.registerPermissions();
-        for (String name : List.of("claim", "claima", "unclaim", "claimflag", "claimflags")) {
+        for (String name : List.of("claim", "claima", "unclaim", "claimflag", "claimflags", "trust", "untrust")) {
             Objects.requireNonNull(getCommand(name)).setExecutor(commands);
             Objects.requireNonNull(getCommand(name)).setTabCompleter(commands);
         }

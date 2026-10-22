@@ -7,6 +7,33 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.saltymc.Fixtures.*;
 
 class TrustRulesTest {
+    @Test void ownersAndManagersCannotTrustOrUntrustThemselvesInRootsOrChildren() {
+        Claim root=root(0,9);
+        root=root.change(root.bounds(),true,Map.of(new Subject(FRIEND),Trust.MANAGE),Map.of());
+        Claim child=child(root,1,5);
+        child=child.change(child.bounds(),false,Map.of(new Subject(FRIEND),Trust.MANAGE),Map.of());
+        ClaimState state=state(root,child);
+        for(Claim claim:List.of(root,child)) for(UUID actor:List.of(OWNER,FRIEND)) for(boolean staff:List.of(false,true)) {
+            for(Trust level:List.of(Trust.ACCESS,Trust.BUILD,Trust.MANAGE)) {
+                var error=assertThrows(org.saltymc.message.MessageException.class,
+                        ()->TrustRules.edit(state,claim,actor,staff,new Subject(actor),level,false,false));
+                assertEquals("errors.self-trust",error.notice().key());
+            }
+            var error=assertThrows(org.saltymc.message.MessageException.class,
+                    ()->TrustRules.edit(state,claim,actor,staff,new Subject(actor),null,true,false));
+            assertEquals("errors.self-trust",error.notice().key());
+        }
+    }
+    @Test void untrustAllKeepsTheActorsOwnGrant() {
+        Claim root=root(0,9);
+        root=root.change(root.bounds(),true,Map.of(new Subject(OWNER),Trust.ACCESS,new Subject(FRIEND),Trust.MANAGE,
+                new Subject(STRANGER),Trust.BUILD,Subject.PUBLIC,Trust.ACCESS),Map.of());
+        ClaimState state=state(root);
+        var ownerCleared=TrustRules.edit(state,root,OWNER,false,null,null,true,true);
+        assertEquals(Map.of(new Subject(OWNER),Trust.ACCESS),ownerCleared);
+        var managerCleared=TrustRules.edit(state,root,FRIEND,false,null,null,true,true);
+        assertEquals(Map.of(new Subject(FRIEND),Trust.MANAGE),managerCleared);
+    }
     @Test void cumulativeTrustAndOwnerAuthority() {
         for(Trust t:Trust.values()) assertTrue(t.grants(Trust.VISITOR));
         assertTrue(Trust.MANAGE.grants(Trust.BUILD)); assertTrue(Trust.BUILD.grants(Trust.CONTAINER)); assertTrue(Trust.CONTAINER.grants(Trust.ACCESS));

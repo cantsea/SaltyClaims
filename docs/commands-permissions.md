@@ -22,19 +22,18 @@ Player commands require a player sender. Context resolves to the child containin
 
 | Command | Purpose | Permission | Claim authority |
 | --- | --- | --- | --- |
-| `/claim help` | Explain tools, corner selection, child height, resizing and resets, then show authorized commands. | `saltyclaims.command.claim.help` | None |
-| `/claim cancel` | Clear a selection or pending confirmation. | `saltyclaims.command.claim.cancel` | Sender's own session |
+| `/claim help` | Explain tools, selection, resizing and each trust level, then show authorized commands. | `saltyclaims.command.claim.help` | None |
 | `/claim info [owner]` | Show owner, both corners, size/area, and local trust groups for this claim. | `saltyclaims.command.claim.info` | Public summary; trust details only for owner/Manage |
 | `/claim list` | List owned parents and their children with dimensions, area, both corners, and allowance. | `saltyclaims.command.claim.list` | Own claims |
 | `/unclaim` | Immediately remove the child here, otherwise the main claim and its children; no confirmation. | `saltyclaims.command.unclaim` | Owner; player only |
 | `/unclaim all` | Immediately remove all owned claims and children across all worlds; no confirmation. | `saltyclaims.command.unclaim.all` | Owner; player only |
-| `/claim trust <player\|public> [level]` | Set a local grant; omitted level means Build. | `saltyclaims.command.claim.trust` | Owner or scoped Manage; delegation limits apply |
-| `/claim untrust <player\|public\|all>` | Remove local grants; local public access may remain. | `saltyclaims.command.claim.untrust` | Owner or scoped Manage; cannot remove peer Manage grants |
+| `/trust <player\|public> [level]` | Set a local grant; omitted level means Access. | `saltyclaims.command.trust` | Owner or scoped Manage; delegation limits apply |
+| `/untrust <player\|public\|all>` | Remove local grants; local public access may remain. | `saltyclaims.command.untrust` | Owner or scoped Manage; cannot remove peer Manage grants |
 | `/claim trustlist` | Show local grants. | `saltyclaims.command.claim.trustlist` | Owner or scoped Manage |
 | `/claimflags` | List only flags the sender can edit in their current owned claim. | `saltyclaims.command.claimflags` plus toggle/flag eligibility | Owner |
 | `/claimflag toggle [flag]` | Toggle an editable flag; omitted flag lists available flags. | `saltyclaims.command.claimflag.toggle` plus `saltyclaims.flag.<key>` | Owner; flag must be player-editable |
 
-Trust levels are `access`, `container`, `build`, and `manage`. Public cannot receive Manage. Managers may grant/revoke only Access, Container, and Build within their scope. If `/claim untrust all` is used by a manager, it removes only grants the manager is authorized to remove and reports retained Manage grants. Child trust is independent of parent trust.
+Trust levels are `access`, `container`, `build`, and `manage`. Public cannot receive Manage. Managers may grant/revoke only Access, Container, and Build within their scope. If `/untrust all` is used by a manager, it removes only grants the manager is authorized to remove and reports retained Manage grants. Child trust is independent of parent trust. Owners and managers cannot target themselves with trust/untrust, including administrative routes. /untrust all preserves the sender’s own local grant. Only Access, Container, Build and Manage are assignable; Visitor means no grant and Owner derives from ownership.
 
 Every ordinary trust/untrust action targets the child containing the sender, otherwise the parent. Explicit `--root` remains available when deliberately editing parent grants. No bulk trust commands are provided. Children do not inherit parent grants, including public trust.
 
@@ -42,7 +41,7 @@ Info shows normalized inclusive corner 1 (minimum X/Y/Z) and corner 2 (maximum X
 
 Children use the normal info, deletion, trust, and standalone flag commands once selected, each with its own command permission and the same claim authority checks. Creating a child requires that the selected parent is a root, never another child. Children never inherit parent trust or flags, including legacy children with inheritance enabled in storage. The parent owner retains ownership, and a parent manager who creates a child receives a local Manage grant; no other parent player or public grants carry over. Each child uses its own flags or configured defaults. Player creation and resizing are tool-only; `/claim resize`, `/claim child create` and `/claim child restrict` are removed. The existing `saltyclaims.command.claim.child.create` and `saltyclaims.command.claim.resize` permissions control tools, not commands. Staff retain `/claima resize` for coordinate-based edits.
 
-Regular selection uses the stick (`tools.selection`), child selection the bone (`tools.child-selection`), and inspection the feather (`tools.inspection`), with three distinct configurable items. The child tool selects the parent from the first click, so it must start inside a root the sender owns or manages. Switching away from either claim tool clears both corners, selected parent/resize state and its particle preview immediately. Returning to the tool starts a new selection. Cancelled item switches preserve selection. The mode commands and their `saltyclaims.command.claim.mode.basic` / `mode.child` permissions are removed. Tool actions retain their normal create/child-create/resize permissions.
+Regular selection uses the stick (`tools.selection`), child selection the bone (`tools.child-selection`), and inspection the feather (`tools.inspection`), with three distinct configurable items. The child tool selects the parent from the first click, so it must start inside a root the sender owns or manages. Switching away from either claim tool clears both corners, selected parent/resize state and its particle preview immediately. Returning to the tool starts a new selection. Inactive selections expire after selection-timeout-seconds (default 120). The cancel command and its permission are removed. Cancelled item switches preserve selection. The mode commands and their `saltyclaims.command.claim.mode.basic` / `mode.child` permissions are removed. Tool actions retain their normal create/child-create/resize permissions.
 
 Parent selections always produce full-height rectangles regardless of corner Y. Child selections and tool resizes infer height from the two corners. An admin resize with explicit coordinates uses its supplied/existing Y bounds.
 
@@ -50,7 +49,7 @@ Selecting an owned corner with the matching tool shows the entire old border rat
 
 Right-clicking claimed land with the selection tool shows its borders and owner name and clears any in-progress selection. Existing owned corners can still start a resize, and child selection can use unoccupied parts of its selected parent. An existing child interior cannot start another child selection. Final mutation validation continues checking overlaps across the whole area, including claims between two otherwise valid corners.
 
-GP-style actions are exposed through `/claim` subcommands only. For example, `/claim trust Alex access` grants Access and `/claim trust Alex manage` grants Manage, with the latter remaining owner-only. Right-clicking the second tool corner immediately attempts creation or resizing through the same validation and save path as commands. Insufficient allowance, overlap, invalid geometry, and missing permissions reject the operation; both corners and the selected parent/resize target are cleared, so the next click starts a new selection. Selection tools enforce the corresponding create/resize/child-create permission.
+Trust editing uses standalone `/trust` and `/untrust`; inspection remains `/claim trustlist`. The old player trust/untrust subcommands are removed. The two new permissions are independent, default true, and do not inherit authorization from the former permission nodes. For example, `/trust Alex access` grants Access and `/trust Alex manage` grants Manage, with the latter remaining owner-only. Right-clicking the second tool corner immediately attempts creation or resizing through the same validation and save path as commands. Insufficient allowance, overlap, invalid geometry, and missing permissions reject the operation; both corners and the selected parent/resize target are cleared, so the next click starts a new selection. Selection tools enforce the corresponding create/resize/child-create permission.
 
 `/claim help` (also shown by bare `/claim`) explains claiming with the configured regular, child and inspection tools. Item names are shown in readable lowercase text, and the instructions cover two corners, inferred child height, resizing and automatic selection resets. Available commands follow, filtered by their individual permissions. `/claim tool` and its permission are removed, along with `/claim pos1`, `/claim pos2`, `/claim create`, and `/claim explain`. Help does not give items or start a selection. The existing `saltyclaims.command.claim.create` permission remains registered (default true) exclusively to authorize regular tool creation; the other removed command permissions are no longer registered.
 
@@ -79,7 +78,7 @@ GP-style actions are exposed through `/claim` subcommands only. For example, `/c
 
 Each administrative action requires its exact command permission; there is no shared edit permission. Gameplay bypass does not authorize deletion, trust changes, policy configuration, or allowance changes. Configuration locks cannot be overridden with a claim flag command. Staff use the explicit `/claima` action for administrative authority rather than gaining unrelated player command capabilities.
 
-Admin resize syntax is `/claima resize <owner> <minX> <minZ> <maxX> <maxZ> [minY maxY]`. If coordinates are omitted, a player sender's selection is used. Root claims remain full height. Trust syntax is `/claima trust <owner> <player|public> [level]`. Console requires explicit coordinates for resizing. Admin resizes can exceed the owner's allowance, but still obey size, containment, overlap, and world rules.
+Admin resize syntax is `/claima resize <owner> <minX> <minZ> <maxX> <maxZ> [minY maxY]`. If coordinates are omitted, a player sender's selection is used. Root claims remain full height. Trust syntax is `/claima trust <owner> <player|public> [level]`, defaulting to Access when omitted. Console requires explicit coordinates for resizing. Admin resizes can exceed the owner's allowance, but still obey size, containment, overlap, and world rules.
 
 For example, `/claima trust Alex Sam build --at world 100 64 200` grants Sam Build in Alex's claim at those coordinates. `/claima inspect here --at world 100 64 200` inspects that location without requiring a known owner name.
 
@@ -94,6 +93,8 @@ Server-wide resets have their own command and confirmation, without owner/locati
 | Node | Default | Meaning |
 | --- | --- | --- |
 | `saltyclaims.command.claim.child.create` | `true` | Child-tool creation inside a parent owned or managed by the sender; no command route. |
+| `saltyclaims.command.trust` | `true` | Grant local trust, defaulting to Access; owner/Manage authority required. |
+| `saltyclaims.command.untrust` | `true` | Remove local grants; cannot target yourself as owner/manager. |
 | `saltyclaims.command.claim.resize` | `true` | Resize owned claims with their matching tools; no player command route. |
 | `saltyclaims.command.claimflags` | `true` | List available flag edits in an owned claim. |
 | `saltyclaims.command.claimflag.toggle` | `true` | Toggle an eligible flag in an owned claim. |

@@ -25,7 +25,7 @@ Run `/claim help` for claiming instructions, configured tool items, and the comm
 
 Defaults: 10,000 starting claim blocks, 20 roots, 100 children per root, and a minimum X/Z width of three. Root area is charged once; children are free. Playtime accrual is not implemented. Configure limits and tool items in `plugins/SaltyClaims/config.yml`.
 
-Particles first outline the selected block, then expand to the selected rectangle or cuboid. `particle-duration-seconds: 10` controls how long the current border repeats after a selection or inspection; set it to `0` to disable particles (range 0–300). New previews replace the previous border, and `/claim cancel`, disconnecting, changing worlds, or a successful reload clears it.
+Particles first outline the selected block, then expand to the selected rectangle or cuboid. `particle-duration-seconds: 10` controls how long the current border repeats after a selection or inspection; set it to `0` to disable particles (range 0–300). New previews replace the previous border. Switching away from a selection tool, disconnecting, changing worlds, or a successful reload clears it. Inactive selections expire after `selection-timeout-seconds` (default 120); the border has its own particle duration. There is no cancel command.
 
 Border colors are configured separately using quoted hex colors. Run `/claima reload` after editing:
 
@@ -42,13 +42,13 @@ Right-clicking claimed land with the regular claim tool shows its border and `Th
 ## Trust, children, and flags
 
 ```text
-/claim trust Alex access
-/claim trust Alex container
-/claim trust Alex build
-/claim trust Alex manage
-/claim trust public access
+/trust Alex access
+/trust Alex container
+/trust Alex build
+/trust Alex manage
+/trust public access
 /claim trustlist
-/claim untrust Alex
+/untrust Alex
 
 # Use the bone inside your parent claim; no mode command is needed.
 # Right-click two corners: same Y creates a full-height child; different Y creates a 3D child.
@@ -59,7 +59,7 @@ Right-clicking claimed land with the regular claim tool shows its border and `Th
 
 Commands act on the child at your location, otherwise the root. Use `--root`, `--owner <player>`, or `--at <world> <x> <y> <z>` for explicit targeting. An owner name selects their sole root remotely; multiple claims require a location. Commands and messages use player names and claim locations. Children cannot contain children. Owners and parent managers can create children. Children never inherit parent trust or flags, including older saved children. The parent owner retains ownership, and a manager who creates the child receives a local Manage grant. Other parent members and public grants have no access unless granted locally. Child flags use their own overrides or the configured claim defaults. Player creation and resizing use only the regular/child tools; the resize, child create and restrict commands are removed. Staff retain /claima resize for coordinate-based edits. Managers can delegate lower trust, but resizing, ownership, flag edits, and manager assignment remain owner-only.
 
-`/claim info` shows who owns the claim, its corners and size. Owners/managers also see every assignable trust level, including empty levels, with only the selected claim’s local grants shown. `/claim list` lists each owned claim followed by its child claims, with size and corners on two short lines; only main claim areas count toward the allowance. Full-height claims show X/Z corners; 3D child claims also show Y and height in their size. Trust commands edit only the selected child or main claim.
+`/claim info` shows who owns the claim, its corners and size. Owners/managers also see every assignable trust level, including empty levels, with only the selected claim’s local grants shown. `/claim list` lists each owned claim followed by its child claims, with size and corners on two short lines; only main claim areas count toward the allowance. Full-height claims show X/Z corners; 3D child claims also show Y and height in their size. Trust commands edit only the selected child or main claim. Use /trust <player|public> [level] and /untrust <player|public|all>; omitted trust levels grant Access. Owners and managers cannot trust or untrust themselves, and /untrust all preserves the sender’s own grant. The new permissions are saltyclaims.command.trust and saltyclaims.command.untrust; former /claim trust and /claim untrust routes are removed. /claim help briefly explains every trust level.
 
 Regular claims use `tools.selection: STICK`; child claims use `tools.child-selection: BONE`; inspection uses `tools.inspection: FEATHER`. All three items must be distinct. The child tool chooses its parent from the first clicked block. Switching away from a claim tool clears its selection and particle preview immediately, including resize state. Returning to the tool starts fresh. `/claim mode basic` and `/claim mode child` have been removed.
 
@@ -101,7 +101,7 @@ Use `/unclaim` to remove the child claim you are standing in, or the main claim 
 /claima reload
 ```
 
-Each executable player/admin subcommand has its own permission; there is no shared root permission. Player nodes default to true and admin nodes to op. For example, `saltyclaims.command.claim.create` and `saltyclaims.command.claima.delete` are independent. Flag editing also checks `saltyclaims.flag.<key>`. Administrative bypass is off on each connection. It bypasses player gameplay checks but does not grant command permissions or flag-edit authority.
+Each executable player/admin subcommand has its own permission; there is no shared root permission. Player nodes default to true and admin nodes to op. For example, `saltyclaims.command.claim.create` and `saltyclaims.command.claima.delete` are independent. Flag editing also checks `saltyclaims.flag.<key>`. Administrative trust commands remain under /claima, and also default omitted levels to Access. Administrative bypass is off on each connection. It bypasses player gameplay checks but does not grant command permissions or flag-edit authority.
 
 `/claima reset all` requests deletion of every claim on this server. Confirm within 30 seconds using `/claima reset all confirm`. These require `saltyclaims.command.claima.reset.all` and `saltyclaims.command.claima.reset.all.confirm` respectively; confirmation also rechecks the request permission. Reset removes all parents, children, local trust, and local flags, clears selection previews after saving, and releases all used area. Earned/bonus balances, configuration, and backups remain. Any claim change invalidates the pending reset.
 

@@ -7,6 +7,44 @@ import java.util.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 class CommandPermissionsTest {
+    @Test void cancelCommandIsRemovedFromExecutionHelpAndCompletion() {
+        ClaimCommands commands=new ClaimCommands(null); List<String> messages=new ArrayList<>();
+        var sender=sender(Set.of("saltyclaims.command.claim.cancel",ClaimCommands.permission(false,"help")),messages);
+        commands.onCommand(sender,command("claim"),"claim",new String[]{"cancel"});
+        assertEquals(List.of("[SaltyClaims] Unknown command. Use /claim help."),messages);
+        assertTrue(commands.onTabComplete(sender,command("claim"),"claim",new String[]{"can"}).isEmpty());
+        messages.clear(); commands.onCommand(sender,command("claim"),"claim",new String[]{"help"});
+        assertTrue(messages.stream().noneMatch(line->line.contains("/claim cancel")));
+    }
+    @Test void standaloneTrustCommandsHaveIndependentPermissionsAndOldRoutesAreRemoved() {
+        ClaimCommands commands=new ClaimCommands(null);
+        for(String name:List.of("trust","untrust")) {
+            List<String> messages=new ArrayList<>();
+            var oldPermission=Set.of(ClaimCommands.permission(false,name));
+            commands.onCommand(sender(oldPermission,messages),command(name),name,new String[]{"Alex"});
+            assertEquals(List.of("[SaltyClaims] You do not have permission to do that."),messages);
+            messages.clear(); commands.onCommand(sender(oldPermission,messages),command("claim"),"claim",new String[]{name,"Alex"});
+            assertEquals(List.of("[SaltyClaims] Unknown command. Use /claim help."),messages);
+            assertFalse(ClaimCommands.PLAYER_PATHS.contains(name));
+            assertTrue(commands.onTabComplete(sender(oldPermission,new ArrayList<>()),command(name),name,new String[]{"Alex",""}).isEmpty());
+        }
+        var permitted=sender(Set.of(ClaimCommands.trustPermission(false)),new ArrayList<>());
+        assertEquals(List.of("access","build","container","manage"),commands.onTabComplete(permitted,command("trust"),"trust",new String[]{"Alex",""}));
+    }
+    @Test void trustDefaultsToAccessAndExplicitLevelsArePreserved() {
+        assertEquals(org.saltymc.trust.Trust.ACCESS,ClaimCommands.trustLevel(List.of("trust","Alex"),2));
+        assertEquals(org.saltymc.trust.Trust.ACCESS,ClaimCommands.trustLevel(List.of("trust","Owner","Alex"),3));
+        assertEquals(org.saltymc.trust.Trust.BUILD,ClaimCommands.trustLevel(List.of("trust","Alex","build"),2));
+    }
+    @Test void helpExplainsTrustAndAdvertisesOnlyAuthorizedStandaloneRoutes() {
+        List<String> messages=new ArrayList<>();
+        new ClaimCommands(null).onCommand(sender(Set.of(ClaimCommands.permission(false,"help"),ClaimCommands.trustPermission(false)),messages),
+                command("claim"),"claim",new String[]{"help"});
+        for(String level:List.of("Access (default):","Container:","Build:","Manage:","Owner:"))
+            assertTrue(messages.stream().anyMatch(line->line.contains(level)),level);
+        assertTrue(messages.stream().anyMatch(line->line.contains("/trust <player|public>")));
+        assertTrue(messages.stream().noneMatch(line->line.contains("/claim trust ")||line.contains("/untrust <")));
+    }
     @Test void oldFlagRoutesAreRemovedFromBothCommandFamilies() {
         ClaimCommands commands=new ClaimCommands(null);
         for(boolean admin:List.of(false,true)) for(String route:List.of("flag","flags")) {
