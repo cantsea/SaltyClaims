@@ -54,4 +54,12 @@ class SettingsTest {
         for(String level:new String[]{"visitor","access","container","build","manage","owner"}) assertTrue(yaml.contains("#   "+level+":"),level);
         assertEquals(12345,Settings.from(candidate.document()).limits().starting());
     }
+    @Test void borderColorsAdoptDefaultsAndPreserveConfiguredHexValues() throws Exception {
+        Settings defaults=load("config-version: 5\n");
+        assertEquals(0xFFFF00,defaults.parentBorderColor().asRGB()); assertEquals(0x00FFFF,defaults.childBorderColor().asRGB());
+        Settings custom=load("border-colors:\n  parent: '#123456'\n  child: '#aBcDeF'\nconfig-version: 5\n");
+        assertEquals(0x123456,custom.parentBorderColor().asRGB()); assertEquals(0xABCDEF,custom.childBorderColor().asRGB());
+        for(String value:new String[]{"red","'#FFF'","'#GG0000'","'#12345678'","123456","null","[]"})
+            assertThrows(IllegalArgumentException.class,()->load("border-colors:\n  child: "+value+"\n"),value);
+    }
 }

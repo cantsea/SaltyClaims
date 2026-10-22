@@ -12,12 +12,12 @@ class ClaimViewTest {
     @Test void rootAndThreeDimensionalChildShowInclusiveSizesAndBothCorners() {
         Claim root=root(-10,-1); var notice=ClaimView.details("commands.list-entry",root,"world","full height","Root",0);
         String line=Messages.defaults().text(notice);
-        assertTrue(line.contains("10 x 10 (100 blocks)")); assertTrue(line.contains("first corner: -10, full height, -10"));
-        assertTrue(line.contains("second corner: -1, full height, -1"));
+        assertTrue(line.contains("10 x 10 (100 blocks)")); assertTrue(line.contains("X -10, Z -10"));
+        assertTrue(line.contains("X -1, Z -1"));
         Claim child=child(root,2,6); notice=ClaimView.details("commands.list-entry",child,"world","full height","Child",0);
         line=Messages.defaults().text(notice);
-        assertTrue(line.contains("4 x 4 (16 blocks), height: 5")); assertTrue(line.contains("first corner: 1, 2, 1")); assertTrue(line.contains("second corner: 4, 6, 4"));
-        assertTrue(Messages.defaults().text(ClaimView.details("commands.corner-first",child,"world","full height","Child",0)).contains("1, 2, 1"));
+        assertTrue(line.contains("4 x 4 x 5 (16 blocks)")); assertTrue(line.contains("X 1, Y 2, Z 1")); assertTrue(line.contains("X 4, Y 6, Z 4"));
+        assertTrue(Messages.defaults().text(ClaimView.details("commands.corner-first",child,"world","full height","Child",0)).contains("X 1, Y 2, Z 1"));
     }
     @Test void ownedListIncludesEachParentsChildrenAndExcludesOtherOwners() {
         Claim root=root(0,9),child=child(root,1,5),another=root(20,29);

@@ -16,26 +16,34 @@ import org.saltymc.claim.*;
 import org.saltymc.flag.*;
 import org.saltymc.selection.SelectionManager.Session;
 import org.saltymc.trust.*;
+import org.saltymc.config.*;
 import java.util.*;
 
 /** All executable paths are independently permission-gated; roots have no blanket gate. */
 public final class ClaimCommands implements CommandExecutor, TabCompleter, Listener {
-    public static final List<String> PLAYER_PATHS = List.of("help", "tool", "pos1", "pos2", "create", "resize", "cancel", "info", "list", "delete", "delete.confirm",
-            "trust", "untrust", "trustlist", "flags", "flag", "explain", "child.create", "child.restrict");
+    public static final List<String> PLAYER_PATHS = List.of("help", "resize", "cancel", "info", "list",
+            "trust", "untrust", "trustlist", "flags", "flag", "child.create", "child.restrict");
     public static final List<String> ADMIN_PATHS = List.of("help", "inspect", "bypass", "delete", "resize", "trust", "untrust", "trustlist", "flag", "flags",
             "balance.show", "balance.set", "balance.add", "balance.remove", "reload", "backup", "delete.confirm", "reset.all", "reset.all.confirm");
     private final SaltyClaims plugin;
     private final DeleteConfirmations confirmations=new DeleteConfirmations();
     public ClaimCommands(SaltyClaims plugin) { this.plugin = plugin; }
     private Messages messages() { return plugin==null?Messages.defaults():plugin.messages(); }
+    private String onOff(boolean value) { return messages().text(value?"labels.enabled":"labels.disabled"); }
+    private String trustLabel(Trust value) { return messages().text("labels.trust-"+value.key()); }
     public void expire() {
         confirmations.expire();
     }
     @EventHandler public void quit(PlayerQuitEvent event) { confirmations.clear(identity(event.getPlayer())); }
     public static String permission(boolean admin, String path) { return "saltyclaims.command." + (admin?"claima.":"claim.") + path; }
+    public static String unclaimPermission(boolean all) { return "saltyclaims.command.unclaim"+(all?".all":""); }
     public void registerPermissions() {
         for (boolean admin : List.of(false,true)) for (String path : admin?ADMIN_PATHS:PLAYER_PATHS)
             register(permission(admin,path), admin?PermissionDefault.OP:PermissionDefault.TRUE);
+        // Existing creation permission still controls the regular claim tool; it is no longer a command route.
+        register(permission(false,"create"),PermissionDefault.TRUE);
+        register(unclaimPermission(false),PermissionDefault.TRUE);
+        register(unclaimPermission(true),PermissionDefault.TRUE);
         for (Flag flag : Flag.values()) register("saltyclaims.flag." + flag.key(),PermissionDefault.TRUE);
         register("saltyclaims.admin.recovery",PermissionDefault.OP);
     }
@@ -71,7 +79,9 @@ public final class ClaimCommands implements CommandExecutor, TabCompleter, Liste
     }
     @Override public boolean onCommand(CommandSender sender, Command command, String label, String[] raw) {
         boolean admin = command.getName().equalsIgnoreCase("claima");
+        boolean selectionAction=false;
         try {
+            if(command.getName().equalsIgnoreCase("unclaim")) { unclaim(sender,raw); return true; }
             List<String> a = new ArrayList<>(Arrays.asList(raw));
             String explicit = null; Location explicitLocation=null; boolean rootScope = false;
             for (int i=0;i<a.size();) {
@@ -92,10 +102,19 @@ public final class ClaimCommands implements CommandExecutor, TabCompleter, Liste
             if(path.equals("reset.all")&&a.size()>2&&a.get(2).equalsIgnoreCase("confirm")) path="reset.all.confirm";
             if(path.equals("delete")&&explicit==null&&a.size()>1&&a.get(1).equalsIgnoreCase("confirm")) path="delete.confirm";
             if (!(admin?ADMIN_PATHS:PLAYER_PATHS).contains(path)) throw new MessageException("errors.unknown-command","command",label);
+            selectionAction=Set.of("child.create","resize").contains(path);
             String node = permission(admin,path); require(sender,node);
             if (path.equals("help")) {
+                if(!admin) {
+                    Settings settings=plugin!=null&&plugin.ready()?plugin.settings():Settings.from(YamlData.parse(ConfigFiles.resource("config.yml"),"bundled config"));
+                    messages().send(sender,helpTools(settings));
+                    messages().send(sender,"commands.help-player");
+                    messages().send(sender,"commands.help-commands");
+                }
                 for (String route : admin?ADMIN_PATHS:PLAYER_PATHS) if (sender.hasPermission(permission(admin,route))) messages().send(sender,"commands.help-line","usage",usage(admin,route));
-                messages().send(sender,admin?"commands.help-admin":"commands.help-player"); return true;
+                if(!admin) for(boolean all:List.of(false,true)) if(sender.hasPermission(unclaimPermission(all)))
+                    messages().send(sender,"commands.help-line","usage",all?"/unclaim all":"/unclaim");
+                if(admin) messages().send(sender,"commands.help-admin"); return true;
             }
             if (path.equals("reload")) { plugin.reloadSettings(); messages().send(sender,"commands.reloaded"); return true; }
             if (!plugin.ready()) throw new MessageException("errors.maintenance");
@@ -114,13 +133,12 @@ public final class ClaimCommands implements CommandExecutor, TabCompleter, Liste
                 return true;
             }
             if (admin && path.equals("backup")) { plugin.backup(sender); return true; }
-            if (admin && path.equals("bypass")) { Player p=player(sender); plugin.setBypass(p,toggle(arg(a,1,"/claima bypass <on|off>"))); messages().send(sender,"commands.bypass","enabled",plugin.bypass(p)); return true; }
+            if (admin && path.equals("bypass")) { Player p=player(sender); plugin.setBypass(p,toggle(arg(a,1,"/claima bypass <on|off>"))); messages().send(sender,"commands.bypass","enabled",onOff(plugin.bypass(p))); return true; }
             if (path.equals("delete.confirm")) {
                 if(a.size()!=2||rootScope||explicitLocation!=null) throw new MessageException("errors.usage","usage","/"+label+" delete confirm");
                 confirm(sender,admin); return true;
             }
             if (path.equals("cancel")) { plugin.selections().cancel(player(sender)); confirmations.clear(identity(sender)); messages().send(sender,"commands.cancelled"); return true; }
-            if (path.equals("tool")) { messages().send(sender,"commands.tool","selection",plugin.settings().selectionTool(),"child-selection",plugin.settings().childSelectionTool(),"inspection",plugin.settings().inspectionTool()); return true; }
             if (path.startsWith("balance.")) { balance(sender,a,path.substring(8)); return true; }
             if (path.equals("list")) {
                 UUID who=player(sender).getUniqueId();
@@ -130,30 +148,29 @@ public final class ClaimCommands implements CommandExecutor, TabCompleter, Liste
                 long total=plugin.state().accounts().getOrDefault(who,new ClaimState.Account(0,0)).total(plugin.settings().limits().starting());
                 messages().send(sender,"commands.allowance","used",plugin.state().used(who),"total",total); return true;
             }
-            if (path.equals("pos1")||path.equals("pos2")) { Player p=player(sender); plugin.selections().manualPosition(p,path.equals("pos1"),p.getLocation().getBlock().getLocation(),p.getInventory().getItemInMainHand().getType()==plugin.settings().childSelectionTool()); return true; }
-            if (path.equals("create")||path.equals("child.create")) { create(player(sender),path.equals("child.create")); return true; }
+            if (path.equals("child.create")) { create(player(sender),true); return true; }
             Claim claim=target(sender,explicit,explicitLocation,rootScope,admin,a);
             if (path.equals("info")||path.equals("inspect")) { info(sender,claim,admin); return true; }
             if (path.equals("resize")) { resize(sender,claim,admin,a); return true; }
             if (path.equals("delete")) { owner(sender,plugin.state(),claim,admin); requestDelete(sender,claim,node,admin); return true; }
             if (path.equals("trust")||path.equals("untrust")) { trust(sender,claim,a,admin,path.equals("untrust")); return true; }
             if (path.equals("trustlist")) {
-                manager(sender,claim,admin); showTrust(sender,claim);
-                if (!claim.root()) { messages().send(sender,"commands.inherit-trust","enabled",claim.inheritTrust()); if(claim.inheritTrust()) showTrust(sender,plugin.state().root(claim)); }
+                manager(sender,claim,admin);
+                messages().send(sender,"commands.trust-source","source",messages().text("labels.local")); showTrust(sender,claim);
+                if (!claim.root()) {
+                    messages().send(sender,"commands.inherit-trust","enabled",onOff(claim.inheritTrust()));
+                    if(claim.inheritTrust()) { messages().send(sender,"commands.trust-source","source",messages().text("labels.inherited")); showTrust(sender,plugin.state().root(claim)); }
+                }
                 return true;
             }
             if (path.equals("child.restrict")) {
                 owner(sender,plugin.state(),claim,false); if(claim.root()) throw new MessageException("errors.child-required");
                 boolean restricted=toggle(arg(a,2,"/claim child restrict <on|off>"));
-                plugin.mutate(sender,s->ClaimService.replace(s,claim.change(claim.bounds(),!restricted,claim.trust(),claim.flags())),Notice.of("success.restricted","enabled",restricted,"id",claim.id())); return true;
+                plugin.mutate(sender,s->ClaimService.replace(s,claim.change(claim.bounds(),!restricted,claim.trust(),claim.flags())),Notice.of("success.restricted","enabled",onOff(!restricted),"id",claim.id())); return true;
             }
-            if (path.equals("flags")||path.equals("explain")) {
+            if (path.equals("flags")) {
                 manager(sender,claim,admin); World world=world(claim);
-                if(path.equals("explain")) {
-                    Flag f=Flag.parse(arg(a,1,"/claim explain <flag> [player]")); UUID who=a.size()>2?resolvePlayer(a.get(2)):player(sender).getUniqueId();
-                    Policy.Value value=plugin.value(claim,f,world);
-                    messages().send(sender,"commands.explain","flag",f.key(),"value",value.value(),"source",value.source(),"allowed",Policy.check(plugin.state(),claim,who,f,value,false).allowed(),"trust",plugin.state().trust(claim,who));
-                } else for(Flag f:Flag.values()) messages().send(sender,"commands.flag-entry","flag",f.key(),"value",plugin.value(claim,f,world).value(),"source",plugin.value(claim,f,world).source());
+                for(Flag f:Flag.values()) messages().send(sender,"commands.flag-entry","flag",f.key(),"value",plugin.value(claim,f,world).value(),"source",plugin.value(claim,f,world).source());
                 return true;
             }
             if (path.equals("flag")) {
@@ -166,10 +183,33 @@ public final class ClaimCommands implements CommandExecutor, TabCompleter, Liste
                 if(value.equals("reset")) overrides.remove(flag); else overrides.put(flag,flag.validate(value));
                 plugin.mutate(sender,s->ClaimService.replace(s,claim.change(claim.bounds(),claim.inheritTrust(),claim.trust(),overrides)),Notice.of("success.flag","flag",flag.key(),"value",value,"id",claim.id())); return true;
             }
-        } catch (IllegalArgumentException|ArithmeticException e) { messages().sendError(sender,e); }
-        catch (Exception e) { plugin.getLogger().log(java.util.logging.Level.SEVERE,"Command failure",e); messages().send(sender,"errors.action-failed"); }
+        } catch (IllegalArgumentException|ArithmeticException e) { if(selectionAction) clearFailedSelection(sender); messages().sendError(sender,e); }
+        catch (Exception e) { if(selectionAction) clearFailedSelection(sender); plugin.getLogger().log(java.util.logging.Level.SEVERE,"Command failure",e); messages().send(sender,"errors.action-failed"); }
         return true;
     }
+    private void clearFailedSelection(CommandSender sender) {
+        if(sender instanceof Player player&&plugin!=null&&plugin.selections()!=null) plugin.selections().cancel(player);
+    }
+    private void unclaim(CommandSender sender,String[] args) {
+        boolean all=args.length>0&&args[0].equalsIgnoreCase("all");
+        require(sender,unclaimPermission(all));
+        if(args.length!=(all?1:0)) throw new MessageException("errors.usage","usage","/unclaim [all]");
+        Player player=player(sender);
+        if(!plugin.ready()) throw new MessageException("errors.maintenance");
+        UUID actor=player.getUniqueId();
+        if(all) {
+            int count=ClaimView.owned(plugin.state(),actor).size();
+            plugin.mutate(sender,state->ClaimService.unclaimAll(state,actor),Notice.of("success.unclaimed-all","count",count),()->plugin.selections().cancel(player));
+        } else {
+            Claim claim=ClaimTargets.select(plugin.state(),null,plugin.at(player.getLocation()),false,false);
+            String type=messages().text(claim.root()?"labels.root":"labels.child");
+            plugin.mutate(sender,state->ClaimService.unclaim(state,actor,claim.id()),Notice.of("success.unclaimed","type",type),()->plugin.selections().cancel(player));
+        }
+    }
+    public static Notice helpTools(Settings settings) {
+        return Notice.of("commands.help-tools","selection",itemName(settings.selectionTool()),"child-selection",itemName(settings.childSelectionTool()),"inspection",itemName(settings.inspectionTool()));
+    }
+    private static String itemName(Material item) { return item.name().toLowerCase(Locale.ROOT).replace('_',' '); }
     private static String usage(boolean admin,String path) {
         String base="/"+(admin?"claima":"claim")+" "+path.replace('.',' ');
         return base+switch(path) {
@@ -180,7 +220,6 @@ public final class ClaimCommands implements CommandExecutor, TabCompleter, Liste
             case "inspect","delete","flags","trustlist" -> admin?" <owner>":"";
             case "resize" -> admin?" <owner> [minX minZ maxX maxZ [minY maxY]]":"";
             case "bypass","child.restrict" -> " <on|off>";
-            case "explain" -> " <flag> [player]";
             case "balance.show" -> " <player>";
             case "balance.set","balance.add","balance.remove" -> " <player> <amount>";
             default -> "";
@@ -223,7 +262,7 @@ public final class ClaimCommands implements CommandExecutor, TabCompleter, Liste
             if(!root.root()||!root.world().equals(world.getUID())) throw new MessageException("errors.child-world"); parent=root.id();
         }
         Claim claim=new Claim(UUID.randomUUID(),world.getUID(),child?null:p.getUniqueId(),parent,bounds,true,System.currentTimeMillis(),0,Map.of(),Map.of());
-        plugin.mutate(p,s->ClaimService.put(s,claim,plugin.settings().limits(),false),Notice.of("success.created","type",messages().text(child?"labels.child":"labels.root"),"id",claim.id()));
+        plugin.mutate(p,s->ClaimService.put(s,claim,plugin.settings().limits(),false),Notice.of("success.created","type",messages().text(child?"labels.child":"labels.root"),"id",claim.id()),()->{},()->plugin.selections().cancel(p));
         plugin.selections().finish(p);
     }
     private void resize(CommandSender sender, Claim claim, boolean admin, List<String> args) {
@@ -240,8 +279,9 @@ public final class ClaimCommands implements CommandExecutor, TabCompleter, Liste
         if(claim.root()) b=new Bounds(b.minX(),b.maxX(),b.minZ(),b.maxZ(),null,null);
         World resizeWorld=world(claim); validateWorld(resizeWorld,b); Claim replacement=claim.change(b,claim.inheritTrust(),claim.trust(),claim.flags());
         plugin.mutate(sender,s->ClaimService.put(s,replacement,plugin.settings().limits(),admin),Notice.of("success.resized","id",claim.id()),()->{
-            if(sender instanceof Player p) plugin.selections().preview(p,replacement.bounds(),resizeWorld);
-        });
+            if(sender instanceof Player p&&p.getInventory().getItemInMainHand().getType()==(claim.root()?plugin.settings().selectionTool():plugin.settings().childSelectionTool()))
+                plugin.selections().preview(p,replacement.bounds(),resizeWorld,!replacement.root());
+        },()->clearFailedSelection(sender));
         if(sender instanceof Player p) plugin.selections().finish(p);
     }
     private void trust(CommandSender sender, Claim claim, List<String> args, boolean admin, boolean remove) {
@@ -258,7 +298,7 @@ public final class ClaimCommands implements CommandExecutor, TabCompleter, Liste
         messages().send(sender,"commands.trust-list","id",claim.id(),"grants",grants.isEmpty()?messages().text("labels.none"):grants);
         for(var group:ClaimView.trustGroups(claim,subject->subject.isPublic()?messages().text("labels.public"):plugin.playerName(subject.playerId())).entrySet()) {
             String players=String.join(", ",group.getValue());
-            messages().send(sender,"commands.trust-level","level",group.getKey().key(),"players",players.isEmpty()?messages().text("labels.none"):players);
+            messages().send(sender,"commands.trust-level","level",trustLabel(group.getKey()),"players",players.isEmpty()?messages().text("labels.none"):players);
         }
     }
     private Notice details(String key,Claim claim) {
@@ -271,14 +311,14 @@ public final class ClaimCommands implements CommandExecutor, TabCompleter, Liste
         messages().send(sender,details("commands.corner-second",claim));
         messages().send(sender,details("commands.bounds",claim));
         if(sender instanceof Player p) {
-            messages().send(sender,"commands.your-trust","trust",plugin.state().trust(claim,p.getUniqueId()));
-            World world=Bukkit.getWorld(claim.world()); if(world!=null) plugin.selections().preview(p,claim.bounds(),world);
+            messages().send(sender,"commands.your-trust","trust",trustLabel(plugin.state().trust(claim,p.getUniqueId())));
+            World world=Bukkit.getWorld(claim.world()); if(world!=null) plugin.selections().preview(p,claim.bounds(),world,!claim.root());
         }
         if(admin||sender instanceof Player p&&plugin.state().trust(claim,p.getUniqueId()).grants(Trust.MANAGE)) {
             messages().send(sender,"commands.trust-owner","owner",plugin.playerName(plugin.state().owner(claim)));
             messages().send(sender,"commands.trust-source","source",messages().text("labels.local")); showTrust(sender,claim);
             if(!claim.root()) {
-                messages().send(sender,"commands.inherit-trust","enabled",claim.inheritTrust());
+                messages().send(sender,"commands.inherit-trust","enabled",onOff(claim.inheritTrust()));
                 if(claim.inheritTrust()) { messages().send(sender,"commands.trust-source","source",messages().text("labels.inherited")); showTrust(sender,plugin.state().root(claim)); }
             }
         }
@@ -308,6 +348,8 @@ public final class ClaimCommands implements CommandExecutor, TabCompleter, Liste
         plugin.mutate(sender,s->{ Map<UUID,ClaimState.Account> accounts=new HashMap<>(s.accounts()); accounts.put(target,account); return new ClaimState(s.claims(),accounts); },Notice.of("success.balance","player",target,"bonus",bonus));
     }
     @Override public List<String> onTabComplete(CommandSender sender,Command command,String label,String[] args) {
+        if(command.getName().equalsIgnoreCase("unclaim"))
+            return args.length==1&&sender.hasPermission(unclaimPermission(true))&&"all".startsWith(args[0].toLowerCase(Locale.ROOT))?List.of("all"):List.of();
         boolean admin=command.getName().equalsIgnoreCase("claima"); List<String> paths=admin?ADMIN_PATHS:PLAYER_PATHS;
         String prefix=args.length==0?"":args[args.length-1].toLowerCase(Locale.ROOT);
         List<String> options=new ArrayList<>();
@@ -315,7 +357,7 @@ public final class ClaimCommands implements CommandExecutor, TabCompleter, Liste
         for(String path:paths) if(sender.hasPermission(permission(admin,path))&&path.startsWith(head)) {
             String remainder=path.substring(head.length()); options.add(remainder.split("\\.")[0]);
         }
-        if(args.length>1&&(args[0].equals("flag")||args[0].equals("explain"))&&sender.hasPermission(permission(admin,args[0]))) {
+        if(args.length>1&&args[0].equals("flag")&&sender.hasPermission(permission(admin,args[0]))) {
             int flagIndex=admin?2:1;
             if(args.length-1==flagIndex) for(Flag f:Flag.values()) options.add(f.key());
             if(args.length-1==flagIndex+1) try { options.addAll(Flag.parse(args[flagIndex]).valuesAllowed()); options.add("reset"); } catch(IllegalArgumentException ignored) { }

@@ -16,16 +16,28 @@ On Linux/macOS, run `bash gradlew build`. Copy `build/libs/SaltyClaims-1.0-SNAPS
 
 ## Claim land
 
+Run `/claim help` for claiming instructions, configured tool items, and the commands you can use. `/claim tool` has been removed.
+
 1. Right-click two opposite block corners with a stick. The second click immediately attempts creation, checking allowance, overlap, and claim limits.
-2. If creation is rejected, read the denial and choose another second corner. For manual selection, use `/claim pos1`, `/claim pos2`, then `/claim create`.
+2. If creation is rejected, the selection clears. Select both corners again.
 3. Inspect with a feather or `/claim info`; view allowance with `/claim list`.
-4. To resize, right-click an owned corner with the matching claim tool, then its new position. The old border stays visible while selecting and after rejected attempts; the new border appears after a successful save. Manual selections can still be applied with `/claim resize`.
+4. To resize, right-click an owned corner with the matching claim tool, then its new position. The old border stays visible while selecting; the new border appears after a successful save. Rejected attempts clear the selection and its preview.
 
 Defaults: 10,000 starting claim blocks, 20 roots, 100 children per root, and a minimum X/Z width of three. Root area is charged once; children are free. Playtime accrual is not implemented. Configure limits and tool items in `plugins/SaltyClaims/config.yml`.
 
 Particles first outline the selected block, then expand to the selected rectangle or cuboid. `particle-duration-seconds: 10` controls how long the current border repeats after a selection or inspection; set it to `0` to disable particles (range 0–300). New previews replace the previous border, and `/claim cancel`, disconnecting, changing worlds, or a successful reload clears it.
 
-Right-clicking claimed land with the regular claim tool shows its border and `This land is already claimed by <owner>.` without changing either selected position. Owned-corner resizing and child selection within the selected parent are allowed. Even when both corners are outside another claim, creation still checks the entire rectangle for overlaps.
+Border colors are configured separately using quoted hex colors. Run `/claima reload` after editing:
+
+```yaml
+border-colors:
+  parent: '#FFFF00' # yellow
+  child: '#00FFFF'  # cyan
+```
+
+These colors apply to selection, inspection and resize borders. Child claims use the child color whether full height or 3D.
+
+Right-clicking claimed land with the regular claim tool shows its border and `This land is already claimed by <owner>.` and clears any in-progress selection. Owned-corner resizing and child selection within the selected parent are allowed. Even when both corners are outside another claim, creation still checks the entire rectangle for overlaps.
 
 ## Trust, children, and flags
 
@@ -46,18 +58,17 @@ Right-clicking claimed land with the regular claim tool shows its border and `Th
 /claim flag pvp allow
 /claim flag container-use public
 /claim flag container-use reset
-/claim explain container-use Alex
 ```
 
 Commands act on the child at your location, otherwise the root. Use `--root`, `--owner <player>`, or `--at <world> <x> <y> <z>` for explicit targeting. An owner name selects their sole root remotely; multiple claims require a location. Commands and messages use player names and claim locations. Children cannot contain children. Restricting a child disables parent trust inheritance, while flags continue to inherit. Managers can delegate lower trust, but ownership, geometry, flag edits, and manager assignment remain owner-only.
 
-`/claim info` shows both normalized corners, width/length, area, height, and child count. Owners/managers also see the owner and every assignable trust level, including empty levels, with local and inherited parent grants shown separately. `/claim list` lists each owned parent followed by its children, with sizes and both corners; only parent areas count toward the allowance. Full-height claims display `full height` in place of bounded Y coordinates. Trust commands edit only the selected child or parent.
+`/claim info` shows who owns the claim, its corners and size. Owners/managers also see every assignable trust level, including empty levels, with access from the main claim listed separately. `/claim list` lists each owned claim followed by its child claims, with size and corners on two short lines; only main claim areas count toward the allowance. Full-height claims show X/Z corners; 3D child claims also show Y and height in their size. Trust commands edit only the selected child or main claim.
 
-Regular claims use `tools.selection: STICK`; child claims use `tools.child-selection: BONE`; inspection uses `tools.inspection: FEATHER`. All three items must be distinct. The child tool chooses its parent from the first clicked block. Switching claim tools starts a fresh selection. `/claim mode basic` and `/claim mode child` have been removed.
+Regular claims use `tools.selection: STICK`; child claims use `tools.child-selection: BONE`; inspection uses `tools.inspection: FEATHER`. All three items must be distinct. The child tool chooses its parent from the first clicked block. Switching away from a claim tool clears its selection and particle preview immediately, including resize state. Returning to the tool starts fresh. `/claim mode basic` and `/claim mode child` have been removed.
 
 `config.yml` includes a commented reference for every flag, its built-in default, and its effect, along with cumulative trust levels and their default access. Flags may change the access required for each action.
 
-To delete, run `/claim delete`. The response is `Type /claim delete confirm to delete this claim.` (or `child claim`). Run that command within 30 seconds. Confirmation remains bound to the original claim/tree even if you move; deleting a parent also removes its children.
+Use `/unclaim` to remove the child claim you are standing in, or the main claim when there is no child. Removing a main claim also removes its children. `/unclaim all` removes every claim you own across all worlds. Both apply immediately without confirmation, preserve your earned/bonus claim blocks, and release the used area. Permissions are `saltyclaims.command.unclaim` and `saltyclaims.command.unclaim.all` (both default true). The old player `/claim delete` commands are removed.
 
 ## Administration
 
@@ -90,10 +101,12 @@ prefix: '&8[&bSaltyClaims&8] &r'
 errors:
   missing-permission: '&cYou need {permission}.'
 success:
-  created: '&aCreated {type} {id}.'
+  created: '&a{type} created.'
 ```
 
 The shipped prefix is `[SaltyClaims] `. Standard `&` color codes are supported. Keep each template's `{placeholders}` when customizing it. Placeholders are inserted literally after color processing, so `&` codes and placeholder-like text in data are not evaluated. Missing message keys fall back to bundled defaults; `prefix: ''` removes the prefix and an empty message suppresses that response. Prefixes need not be repeated in templates. Server diagnostic/audit logs continue through the standard plugin logger.
+
+Defaults use short wording such as `Claim created.` and `Only the claim owner can do that.` They hide redundant location details, internal policy sources and raw flag maps. Access levels and switches use readable names and On/Off or Yes/No. Detailed placeholders remain available for customized messages. The version-8 migration changes only exact previous stock wording, preserving customized messages and prefixes.
 
 Run `/claima reload` (permission `saltyclaims.command.claima.reload`) to migrate, validate and apply both files through the same pipeline used at startup. Each has its own `config-version` at the bottom. Unversioned files migrate from 0; invalid/future versions are rejected without overwriting them. Missing settings are added, configured values retained, and obsolete fixed-schema paths removed. See [message documentation](docs/messages.md) for template details.
 

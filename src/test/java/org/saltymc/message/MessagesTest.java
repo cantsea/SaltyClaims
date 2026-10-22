@@ -14,12 +14,12 @@ class MessagesTest {
     @Test void customPrefixAppliesToResponsesAndDefaultFallbacks() throws Exception {
         Messages messages=load("prefix: '[Land] '\ncommands:\n  allowance: '{used} of {total}'\n");
         assertEquals(List.of("[Land] 10 of 20"),messages.lines(Notice.of("commands.allowance","used",10,"total",20)));
-        assertEquals(List.of("[Land] Wilderness."),messages.lines(Notice.of("selection.wilderness")));
+        assertEquals(List.of("[Land] This land is not claimed."),messages.lines(Notice.of("selection.wilderness")));
     }
     @Test void emptyPrefixAndSuppressedMessages() throws Exception {
         Messages messages=load("prefix: ''\nselection:\n  wilderness: ''\n");
         assertEquals(List.of(),messages.lines(Notice.of("selection.wilderness")));
-        assertEquals(List.of("Configuration and messages validated and reloaded."),messages.lines(Notice.of("commands.reloaded")));
+        assertEquals(List.of("Settings reloaded."),messages.lines(Notice.of("commands.reloaded")));
     }
     @Test void everyLineGetsExactlyOnePrefix() throws Exception {
         Messages messages=load("prefix: '[C] '\ncommands:\n  help-player: |\n    First line\n    Second line\n");
@@ -39,17 +39,21 @@ class MessagesTest {
         assertThrows(IllegalArgumentException.class,()->load("prefix:\n  nested: bad\n"));
         assertThrows(IllegalArgumentException.class,()->load("commands: bad\n"));
         assertThrows(Exception.class,()->load("prefix: [unterminated\n"));
-        assertEquals(List.of("[Old] Wilderness."),old.lines(Notice.of("selection.wilderness")));
+        assertEquals(List.of("[Old] This land is not claimed."),old.lines(Notice.of("selection.wilderness")));
     }
     @Test void validationExceptionsUseConfiguredMessagesAndOnePrefix() throws Exception {
         Messages messages=load("prefix: '[C] '\nerrors:\n  missing-permission: 'Need {permission}'\n");
         MessageException error=new MessageException("errors.missing-permission","permission","node.name");
         assertEquals("Need node.name",messages.error(error));
         assertEquals(List.of("[C] Need node.name"),messages.lines(error.notice()));
-        assertEquals("Enter a valid whole number.",messages.error(new NumberFormatException("internal detail")));
+        assertEquals("Enter a whole number.",messages.error(new NumberFormatException("internal detail")));
     }
     @Test void noticesCopyCallerDataBeforeAsyncUse() {
         Map<String,String> values=new HashMap<>(); values.put("id","before"); Notice notice=new Notice("success.deleted",values); values.put("id","after");
         assertEquals("before",notice.values().get("id")); assertThrows(UnsupportedOperationException.class,()->notice.values().put("id","new"));
+    }
+    @Test void customizedUnclaimAllSuccessCanIncludeRemovedCount() throws Exception {
+        Messages messages=load("success:\n  unclaimed-all: 'Removed {count} claims.'\n");
+        assertEquals(List.of("[SaltyClaims] Removed 3 claims."),messages.lines(Notice.of("success.unclaimed-all","count",3)));
     }
 }

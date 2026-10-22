@@ -43,4 +43,16 @@ public final class ClaimService {
         claims.values().removeIf(c -> id.equals(c.parent())); claims.remove(id);
         return new ClaimState(claims, state.accounts());
     }
+    public static ClaimState unclaim(ClaimState state,UUID actor,UUID id) {
+        if(!state.owner(state.require(id)).equals(actor)) throw new MessageException("errors.owner-only");
+        return delete(state,id);
+    }
+    public static ClaimState unclaimAll(ClaimState state,UUID actor) {
+        Set<UUID> roots=new HashSet<>();
+        for(Claim claim:state.claims().values()) if(claim.root()&&actor.equals(claim.owner())) roots.add(claim.id());
+        if(roots.isEmpty()) throw new MessageException("errors.no-owned-claims");
+        Map<UUID,Claim> claims=new HashMap<>(state.claims());
+        claims.values().removeIf(claim->roots.contains(claim.id())||roots.contains(claim.parent()));
+        return new ClaimState(claims,state.accounts());
+    }
 }

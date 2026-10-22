@@ -17,11 +17,13 @@ public final class ClaimView {
     }
     public static Notice details(String key,Claim claim,String world,String fullHeight,String type,int children) {
         Bounds bounds=claim.bounds();
-        String first=bounds.minX()+", "+(bounds.fullHeight()?fullHeight:bounds.minY())+", "+bounds.minZ();
-        String second=bounds.maxX()+", "+(bounds.fullHeight()?fullHeight:bounds.maxY())+", "+bounds.maxZ();
+        String first="X "+bounds.minX()+(bounds.fullHeight()?"":", Y "+bounds.minY())+", Z "+bounds.minZ();
+        String second="X "+bounds.maxX()+(bounds.fullHeight()?"":", Y "+bounds.maxY())+", Z "+bounds.maxZ();
+        long width=(long)bounds.maxX()-bounds.minX()+1,length=(long)bounds.maxZ()-bounds.minZ()+1;
+        String size=width+" x "+length+(bounds.fullHeight()?"":" x "+((long)bounds.maxY()-bounds.minY()+1));
         return Notice.of(key,"id",claim.id(),"type",type,"world",world,"area",bounds.area(),"width",(long)bounds.maxX()-bounds.minX()+1,
                 "length",(long)bounds.maxZ()-bounds.minZ()+1,"height",bounds.fullHeight()?fullHeight:(long)bounds.maxY()-bounds.minY()+1,
-                "corner1",first,"corner2",second,"bounds",bounds,"children",children);
+                "corner1",first,"corner2",second,"size",size,"bounds",bounds,"children",children);
     }
     /** Parent followed by its children; all entries belong to this owner. */
     public static List<Claim> owned(ClaimState state,UUID owner) {

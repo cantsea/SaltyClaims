@@ -23,7 +23,8 @@ public final class ConfigFiles {
                 new MigrationStep(2,"Add configurable particle duration; preserve all supplied settings",document->{}),
                 new MigrationStep(3,"Add distinct child selection tool; preserve supplied tool choices",document->{}),
                 new MigrationStep(4,"Convert former stock tool set to stick, bone and feather; preserve customized sets",ToolMigrationV4::apply),
-                new MigrationStep(5,"Add full flag and trust reference comments; preserve configured values",document->{})
+                new MigrationStep(5,"Add full flag and trust reference comments; preserve configured values",document->{}),
+                new MigrationStep(6,"Add configurable parent and child border colors; preserve supplied settings",document->{})
         ),Set.of("flags.defaults","flags.enforced","worlds"),Settings::from);
     }
     public static YamlFileSpec messagesFile() {
@@ -34,7 +35,11 @@ public final class ConfigFiles {
                 new MigrationStep(4,"Add claimed-land selection feedback; preserve existing messages",document->{}),
                 new MigrationStep(5,"Add server-wide claim reset messages; preserve existing messages",document->{}),
                 new MigrationStep(6,"Replace stock mode instructions with separate claim tools; remove obsolete mode messages",MessageMigrationV6::apply),
-                new MigrationStep(7,"Expand stock claim and trust details; preserve customized templates",MessageMigrationV7::apply)
+                new MigrationStep(7,"Expand stock claim and trust details; preserve customized templates",MessageMigrationV7::apply),
+                new MigrationStep(8,"Simplify stock messages; preserve custom wording and historical placeholders",MessageMigrationV8::apply),
+                new MigrationStep(9,"Remove obsolete explain command message; preserve remaining templates",document->{}),
+                new MigrationStep(10,"Move tool guidance into claim help; preserve customized messages",MessageMigrationV10::apply),
+                new MigrationStep(11,"Add immediate unclaim command messages; preserve existing templates",document->{})
         ),Set.of(),Messages::from);
     }
     public static ConfigurationPipeline<RuntimeConfiguration> pipeline(Path directory,Consumer<String> logger) {

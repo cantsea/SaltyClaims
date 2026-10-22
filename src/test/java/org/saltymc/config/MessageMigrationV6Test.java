@@ -11,8 +11,8 @@ class MessageMigrationV6Test {
         String yaml="commands:\n  tool: 'Select with {selection}, inspect with {inspection}. Right-click two corners to claim immediately. Click an owned corner, then its new position, to resize.'\n  mode-basic: 'custom old instruction'\n  mode-child: 'custom old instruction'\nerrors:\n  select-root: 'Select a root with /claim mode child.'\n  child-mode: 'old'\nconfig-version: 5\n";
         var candidate=ConfigFiles.messagesFile().prepare(yaml.getBytes(StandardCharsets.UTF_8));
         Messages messages=Messages.from(candidate.document());
-        assertTrue(messages.text("commands.tool","selection","GOLDEN_SHOVEL","child-selection","IRON_SHOVEL","inspection","STICK").contains("subdivide with IRON_SHOVEL"));
-        assertEquals("Use the child claim tool inside your parent claim.",messages.text("errors.select-root"));
+        assertTrue(messages.text("commands.help-tools","selection","GOLDEN_SHOVEL","child-selection","IRON_SHOVEL","inspection","STICK").contains("IRON_SHOVEL for child claims"));
+        assertEquals("Use the child claim tool inside your own claim.",messages.text("errors.select-root"));
         assertFalse(((Map<?,?>)candidate.document().get("commands")).containsKey("mode-child"));
         assertFalse(((Map<?,?>)candidate.document().get("commands")).containsKey("mode-basic"));
         assertFalse(((Map<?,?>)candidate.document().get("errors")).containsKey("child-mode"));
@@ -20,7 +20,7 @@ class MessageMigrationV6Test {
     }
     @Test void customToolInstructionsAndPrefixArePreserved() {
         var candidate=ConfigFiles.messagesFile().prepare("prefix: 'Custom '\ncommands:\n  tool: 'My {selection} and {inspection} tools'\nconfig-version: 5\n".getBytes(StandardCharsets.UTF_8));
-        assertEquals("My GOLD and STICK tools",Messages.from(candidate.document()).text("commands.tool","selection","GOLD","inspection","STICK"));
+        assertEquals("My GOLD and STICK tools",Messages.from(candidate.document()).text("commands.help-tools","selection","GOLD","inspection","STICK"));
         assertEquals("Custom ",candidate.document().get("prefix"));
     }
 }

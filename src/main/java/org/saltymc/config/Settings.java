@@ -1,6 +1,7 @@
 package org.saltymc.config;
 
 import org.bukkit.Material;
+import org.bukkit.Color;
 import org.saltymc.claim.ClaimService;
 import org.saltymc.flag.Flag;
 import java.io.File;
@@ -9,10 +10,11 @@ import java.util.*;
 
 /** Fully validated immutable settings; supplied values never use coercing/fallback getters. */
 public record Settings(ClaimService.Limits limits,Material selectionTool,Material childSelectionTool,Material inspectionTool,
-                       int sessionSeconds,int previewSeconds,Set<String> disabledWorlds,Map<Flag,String> defaults,
+                       int sessionSeconds,int previewSeconds,Color parentBorderColor,Color childBorderColor,Set<String> disabledWorlds,Map<Flag,String> defaults,
                        Map<Flag,String> enforced,Map<String,Map<Flag,String>> worlds) {
     public Settings {
         Objects.requireNonNull(limits); Objects.requireNonNull(selectionTool); Objects.requireNonNull(childSelectionTool); Objects.requireNonNull(inspectionTool);
+        Objects.requireNonNull(parentBorderColor); Objects.requireNonNull(childBorderColor);
         disabledWorlds=Set.copyOf(disabledWorlds); defaults=Map.copyOf(defaults); enforced=Map.copyOf(enforced);
         Map<String,Map<Flag,String>> copy=new LinkedHashMap<>(); worlds.forEach((key,value)->copy.put(key,Map.copyOf(value))); worlds=Map.copyOf(copy);
     }
@@ -31,6 +33,8 @@ public record Settings(ClaimService.Limits limits,Material selectionTool,Materia
         if(select==inspect||select==childSelect||childSelect==inspect) throw ConfigException.at("config.yml","tools","requires distinct selection, child-selection and inspection items");
         int timeout=(int)integer(data,"selection-timeout-seconds","selection-timeout-seconds",10,3600);
         int preview=(int)integer(data,"particle-duration-seconds","particle-duration-seconds",0,300);
+        Map<String,Object> colors=section(data,"border-colors");
+        Color parentColor=color(colors,"parent"),childColor=color(colors,"child");
         Object disabled=data.get("disabled-worlds");
         if(!(disabled instanceof List<?> list)) throw ConfigException.at("config.yml","disabled-worlds","must be a list of nonempty strings");
         Set<String> disabledWorlds=new LinkedHashSet<>();
@@ -44,11 +48,17 @@ public record Settings(ClaimService.Limits limits,Material selectionTool,Materia
             if(entry.getKey().isBlank()) throw ConfigException.at("config.yml","worlds","requires nonempty world names");
             worlds.put(entry.getKey(),flags(YamlData.map(entry.getValue(),"config.yml","worlds."+entry.getKey()),"worlds."+entry.getKey()));
         }
-        return new Settings(new ClaimService.Limits(starting,width,roots,children,area),select,childSelect,inspect,timeout,preview,disabledWorlds,
+        return new Settings(new ClaimService.Limits(starting,width,roots,children,area),select,childSelect,inspect,timeout,preview,parentColor,childColor,disabledWorlds,
                 flags(YamlData.map(flagSection.get("defaults"),"config.yml","flags.defaults"),"flags.defaults"),
                 flags(YamlData.map(flagSection.get("enforced"),"config.yml","flags.enforced"),"flags.enforced"),worlds);
     }
     private static Map<String,Object> section(Map<String,Object> data,String key) { return YamlData.map(data.get(key),"config.yml",key); }
+    private static Color color(Map<String,Object> colors,String key) {
+        Object value=colors.get(key);
+        if(!(value instanceof String text)||!text.matches("#[0-9a-fA-F]{6}"))
+            throw ConfigException.at("config.yml","border-colors."+key,"must be a quoted hex color such as '#FFFF00'");
+        return Color.fromRGB(Integer.parseInt(text.substring(1),16));
+    }
     private static long integer(Map<String,Object> data,String key,String path,long min,long max) {
         Object value=data.get(key);
         if(!(value instanceof Integer)&&!(value instanceof Long)) throw ConfigException.at("config.yml",path,"must be an integer in range "+min+".."+max);

@@ -52,7 +52,7 @@ public final class SaltyClaims extends JavaPlugin implements Listener,SelectionM
         ClaimCommands commands = new ClaimCommands(this);
         selections = new SelectionManager(this,commands::commitSelection);
         commands.registerPermissions();
-        for (String name : List.of("claim", "claima")) {
+        for (String name : List.of("claim", "claima", "unclaim")) {
             Objects.requireNonNull(getCommand(name)).setExecutor(commands);
             Objects.requireNonNull(getCommand(name)).setTabCompleter(commands);
         }
@@ -87,7 +87,7 @@ public final class SaltyClaims extends JavaPlugin implements Listener,SelectionM
     public String worldName(UUID id) { return names.world(id); }
     public String claimName(Claim claim) { return names.claim(claim); }
     public SelectionManager selections() { return selections; }
-    public void showBounds(Player player,Bounds bounds,World world) { selections.preview(player,bounds,world); }
+    public void showBounds(Player player,Bounds bounds,World world,boolean child) { selections.preview(player,bounds,world,child); }
     public boolean ready() { return ready && !closing; }
     public Claim at(Location l) { return index.at(l.getWorld().getUID(), l.getBlockX(), l.getBlockY(), l.getBlockZ()); }
     public boolean bypass(Player p) { return bypass.contains(p.getUniqueId()) && p.hasPermission("saltyclaims.command.claima.bypass"); }
@@ -106,7 +106,7 @@ public final class SaltyClaims extends JavaPlugin implements Listener,SelectionM
     }
     public boolean allow(Player p, Location l, Flag flag) {
         Policy.Decision d = decision(p, l, flag);
-        if (!d.allowed() && p != null) deny(p, d.reason());
+        if (!d.allowed() && p != null) deny(p,messages().text("protection.action-denied"));
         return d.allowed();
     }
     public void deny(Player p, String reason) {
@@ -126,6 +126,9 @@ public final class SaltyClaims extends JavaPlugin implements Listener,SelectionM
         },Notice.of("success.reset-all","count",expected.size()),selections::clear);
     }
     public void mutate(CommandSender sender, Function<ClaimState, ClaimState> operation, Notice success,Runnable committed) {
+        mutate(sender,operation,success,committed,()->{});
+    }
+    public void mutate(CommandSender sender, Function<ClaimState, ClaimState> operation, Notice success,Runnable committed,Runnable failed) {
         if (!ready() || writeFailed) throw new MessageException("errors.storage-unavailable");
         if (busy) throw new MessageException("errors.storage-busy");
         ClaimState before = state, after = operation.apply(before);
@@ -144,6 +147,7 @@ public final class SaltyClaims extends JavaPlugin implements Listener,SelectionM
                     getLogger().info(sender.getName() + ": " + success.key()+" "+success.values());
                 } else {
                     writeFailed = true;
+                    failed.run();
                     messages().send(sender,"errors.save-failed");
                     getLogger().log(Level.SEVERE, "Claim transaction failed", result);
                 }

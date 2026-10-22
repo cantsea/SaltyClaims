@@ -8,6 +8,9 @@ import org.bukkit.event.*;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.player.*;
 import org.bukkit.inventory.EquipmentSlot;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.inventory.InventoryDragEvent;
 import org.saltymc.claim.*;
 import java.util.*;
 import java.util.function.Consumer;
@@ -20,7 +23,7 @@ public final class SelectionManager implements Listener {
     public interface Port {
         boolean ready(); Settings settings(); Messages messages(); ClaimState state(); Claim at(Location location);
         void deny(Player player,String reason); void forget(UUID player);
-        void showBounds(Player player,Bounds bounds,World world);
+        void showBounds(Player player,Bounds bounds,World world,boolean child);
         String playerName(UUID player);
     }
     public static final class Session {
@@ -33,7 +36,7 @@ public final class SelectionManager implements Listener {
     private final Consumer<Player> complete;
     private final LongSupplier clock;
     private final Map<UUID, Session> sessions = new HashMap<>();
-    private record Preview(Player player,Bounds bounds,World world,long expires) { }
+    private record Preview(Player player,Bounds bounds,World world,long expires,Particle.DustOptions dust) { }
     private final Map<UUID,Preview> previews=new HashMap<>();
     public SelectionManager(Port plugin,Consumer<Player> complete) { this(plugin,complete,System::currentTimeMillis); }
     public SelectionManager(Port plugin,Consumer<Player> complete,LongSupplier clock) { this.plugin=plugin; this.complete=complete; this.clock=clock; }
@@ -64,17 +67,17 @@ public final class SelectionManager implements Listener {
         if(first) showSelection(p,s);
         if (s.first != null && s.second != null) {
             Bounds b = bounds(p);
-            if(s.resize==null) plugin.showBounds(p,b,s.first.getWorld());
+            if(s.resize==null) plugin.showBounds(p,b,s.first.getWorld(),!s.mode.equals("basic"));
             plugin.messages().send(p,"selection.preview","area",b.area(),"command","");
         }
     }
-    private void showFirst(Player p,Location point) {
-        plugin.showBounds(p,new Bounds(point.getBlockX(),point.getBlockX(),point.getBlockZ(),point.getBlockZ(),point.getBlockY(),point.getBlockY()),point.getWorld());
+    private void showFirst(Player p,Location point,boolean child) {
+        plugin.showBounds(p,new Bounds(point.getBlockX(),point.getBlockX(),point.getBlockZ(),point.getBlockZ(),point.getBlockY(),point.getBlockY()),point.getWorld(),child);
     }
     private void showSelection(Player player,Session selection) {
         Claim resizing=selection.resize==null?null:plugin.state().claims().get(selection.resize);
-        if(resizing!=null) plugin.showBounds(player,resizing.bounds(),selection.first.getWorld());
-        else if(selection.first!=null) showFirst(player,selection.first);
+        if(resizing!=null) plugin.showBounds(player,resizing.bounds(),selection.first.getWorld(),!resizing.root());
+        else if(selection.first!=null) showFirst(player,selection.first,!selection.mode.equals("basic"));
     }
     private Session toolSession(Player player,boolean child) {
         Session selection=session(player);
@@ -89,19 +92,17 @@ public final class SelectionManager implements Listener {
             if(plugin.state().owner(clicked).equals(player.getUniqueId())) selection.parent=plugin.state().root(clicked).id();
         }
     }
-    public void manualPosition(Player player,boolean first,Location point,boolean child) {
-        Session selection=toolSession(player,child);
-        if(first) { selection.first=null; selection.second=null; selection.resize=null; }
-        selectParent(player,selection,plugin.at(point));
-        set(player,first,point);
-    }
     /** Replace the sender's previous border and refresh its configured lifetime. */
     public void preview(Player p, Bounds b, World world) {
+        preview(p,b,world,false);
+    }
+    public void preview(Player p, Bounds b, World world,boolean child) {
         previews.remove(p.getUniqueId());
         int seconds=plugin.settings().previewSeconds();
         if(seconds==0||!p.getWorld().equals(world)) return;
-        previews.put(p.getUniqueId(),new Preview(p,b,world,clock.getAsLong()+seconds*1000L));
-        render(p,b,world);
+        Particle.DustOptions dust=new Particle.DustOptions(child?plugin.settings().childBorderColor():plugin.settings().parentBorderColor(),1.2f);
+        previews.put(p.getUniqueId(),new Preview(p,b,world,clock.getAsLong()+seconds*1000L,dust));
+        render(p,b,world,dust);
     }
     /** One shared server task repeats active borders; no task is created per click. */
     public void tickPreviews() {
@@ -109,28 +110,28 @@ public final class SelectionManager implements Listener {
         for(var iterator=previews.values().iterator();iterator.hasNext();) {
             Preview preview=iterator.next(); Player player=preview.player();
             if(now>=preview.expires()||!player.isOnline()||!player.getWorld().equals(preview.world())) iterator.remove();
-            else render(player,preview.bounds(),preview.world());
+            else render(player,preview.bounds(),preview.world(),preview.dust());
         }
     }
-    private void render(Player p, Bounds b, World world) {
+    private void render(Player p, Bounds b, World world,Particle.DustOptions dust) {
         if (!p.getWorld().equals(world)) return;
         double y = b.fullHeight() ? p.getLocation().getY() + 0.2 : b.minY() + 0.2;
         List<Double> heights = b.fullHeight() ? List.of(y) : List.of(y, b.maxY() + 1.0);
         for (double h : heights) for (int i = 0; i <= 32; i++) {
             double t = i / 32.0;
-            particle(p, world, b.minX() + (b.maxX() + 1.0 - b.minX()) * t, h, b.minZ());
-            particle(p, world, b.minX() + (b.maxX() + 1.0 - b.minX()) * t, h, b.maxZ() + 1.0);
-            particle(p, world, b.minX(), h, b.minZ() + (b.maxZ() + 1.0 - b.minZ()) * t);
-            particle(p, world, b.maxX() + 1.0, h, b.minZ() + (b.maxZ() + 1.0 - b.minZ()) * t);
+            particle(p, world, b.minX() + (b.maxX() + 1.0 - b.minX()) * t, h, b.minZ(),dust);
+            particle(p, world, b.minX() + (b.maxX() + 1.0 - b.minX()) * t, h, b.maxZ() + 1.0,dust);
+            particle(p, world, b.minX(), h, b.minZ() + (b.maxZ() + 1.0 - b.minZ()) * t,dust);
+            particle(p, world, b.maxX() + 1.0, h, b.minZ() + (b.maxZ() + 1.0 - b.minZ()) * t,dust);
         }
         if(!b.fullHeight()) for(int i=0;i<=16;i++) {
             double h=b.minY()+(b.maxY()+1.0-b.minY())*i/16.0;
-            for(double x:new double[]{b.minX(),b.maxX()+1.0}) for(double z:new double[]{b.minZ(),b.maxZ()+1.0}) particle(p,world,x,h,z);
+            for(double x:new double[]{b.minX(),b.maxX()+1.0}) for(double z:new double[]{b.minZ(),b.maxZ()+1.0}) particle(p,world,x,h,z,dust);
         }
     }
-    private void particle(Player p, World world, double x, double y, double z) {
+    private void particle(Player p, World world, double x, double y, double z,Particle.DustOptions dust) {
         Location point = new Location(world,x,y,z);
-        if (point.distanceSquared(p.getLocation()) < 128 * 128) p.spawnParticle(Particle.DUST, point, 1, new Particle.DustOptions(Color.YELLOW, 1.2f));
+        if (point.distanceSquared(p.getLocation()) < 128 * 128) p.spawnParticle(Particle.DUST, point, 1, dust);
     }
     @EventHandler(priority=EventPriority.LOWEST) public void interact(PlayerInteractEvent e) {
         if (!plugin.ready() || e.getHand() != EquipmentSlot.HAND || e.getAction() != Action.RIGHT_CLICK_BLOCK || e.getClickedBlock() == null) return;
@@ -140,7 +141,7 @@ public final class SelectionManager implements Listener {
             if (!p.hasPermission("saltyclaims.command.claim.info")) return;
             e.setCancelled(true); Claim c = plugin.at(e.getClickedBlock().getLocation());
             if (c == null) plugin.messages().send(p,"selection.wilderness");
-            else { plugin.messages().send(p,"selection.inspect","type",plugin.messages().text(c.root()?"labels.root":"labels.child"),"id",c.id(),"owner",plugin.state().owner(c)); preview(p,c.bounds(),p.getWorld()); }
+            else { plugin.messages().send(p,"selection.inspect","type",plugin.messages().text(c.root()?"labels.root":"labels.child"),"id",c.id(),"owner",plugin.state().owner(c)); preview(p,c.bounds(),p.getWorld(),!c.root()); }
         } else if (held == plugin.settings().selectionTool()||held == plugin.settings().childSelectionTool()) {
             e.setCancelled(true);
             selectCorner(p,e.getClickedBlock().getLocation(),held==plugin.settings().childSelectionTool());
@@ -164,7 +165,8 @@ public final class SelectionManager implements Listener {
                     boolean currentResize=!beginning&&own&&target.id().equals(s.resize);
                     boolean selectedParent=!s.mode.equals("basic")&&own&&target.root()&&target.id().equals(s.parent);
                     if(!resize&&!currentResize&&!selectedParent) {
-                        plugin.showBounds(p,clicked.bounds(),point.getWorld());
+                        cancel(p);
+                        plugin.showBounds(p,clicked.bounds(),point.getWorld(),!clicked.root());
                         plugin.deny(p,plugin.messages().text("selection.already-claimed","owner",plugin.playerName(plugin.state().owner(clicked))));
                         return;
                     }
@@ -187,8 +189,7 @@ public final class SelectionManager implements Listener {
                     complete.accept(p);
                 }
             } catch (IllegalArgumentException|ArithmeticException ex) {
-                s.second=null; // Preserve the first/opposite corner for a corrected second click.
-                if(s.first!=null) showSelection(p,s);
+                cancel(p);
                 plugin.deny(p,plugin.messages().error(ex));
             }
     }
@@ -202,6 +203,35 @@ public final class SelectionManager implements Listener {
     }
     private static void require(Player p, String path) {
         if (!p.hasPermission("saltyclaims.command.claim." + path)) throw new MessageException("errors.missing-permission","permission","saltyclaims.command.claim."+path);
+    }
+    private boolean selectionTool(ItemStack item) {
+        return item!=null&&(item.getType()==plugin.settings().selectionTool()||item.getType()==plugin.settings().childSelectionTool());
+    }
+    @EventHandler(ignoreCancelled=true,priority=EventPriority.MONITOR) public void held(PlayerItemHeldEvent event) {
+        if(event.isCancelled()||!plugin.ready()) return;
+        Player player=event.getPlayer();
+        if(selectionTool(player.getInventory().getItem(event.getPreviousSlot()))) cancel(player);
+    }
+    @EventHandler(ignoreCancelled=true,priority=EventPriority.MONITOR) public void swap(PlayerSwapHandItemsEvent event) {
+        if(event.isCancelled()||!plugin.ready()) return;
+        Player player=event.getPlayer();
+        if(selectionTool(player.getInventory().getItemInMainHand())) cancel(player);
+    }
+    @EventHandler(ignoreCancelled=true,priority=EventPriority.MONITOR) public void drop(PlayerDropItemEvent event) {
+        if(event.isCancelled()||!plugin.ready()) return;
+        Player player=event.getPlayer(); ItemStack dropped=event.getItemDrop().getItemStack();
+        if(selectionTool(dropped)&&player.getInventory().getItemInMainHand().getType()!=dropped.getType()) cancel(player);
+    }
+    @EventHandler(ignoreCancelled=true,priority=EventPriority.MONITOR) public void inventoryClick(InventoryClickEvent event) {
+        if(event.isCancelled()||!plugin.ready()||!(event.getWhoClicked() instanceof Player player)) return;
+        int held=player.getInventory().getHeldItemSlot();
+        if(selectionTool(player.getInventory().getItemInMainHand())
+                &&(event.getClickedInventory()==player.getInventory()&&event.getSlot()==held||event.getHotbarButton()==held)) cancel(player);
+    }
+    @EventHandler(ignoreCancelled=true,priority=EventPriority.MONITOR) public void inventoryDrag(InventoryDragEvent event) {
+        if(event.isCancelled()||!plugin.ready()||!(event.getWhoClicked() instanceof Player player)||!selectionTool(player.getInventory().getItemInMainHand())) return;
+        for(int raw:event.getRawSlots()) if(event.getView().getInventory(raw)==player.getInventory()
+                &&event.getView().convertSlot(raw)==player.getInventory().getHeldItemSlot()) { cancel(player); return; }
     }
     @EventHandler public void quit(PlayerQuitEvent e) { cancel(e.getPlayer()); plugin.forget(e.getPlayer().getUniqueId()); }
     @EventHandler public void world(PlayerChangedWorldEvent e) { cancel(e.getPlayer()); }

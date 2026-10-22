@@ -12,6 +12,7 @@ import java.util.function.UnaryOperator;
 public final class Messages {
     private static final Pattern PLACEHOLDER=Pattern.compile("\\{([a-zA-Z0-9_-]+)}");
     private static final Messages DEFAULTS=readDefaults();
+    private static final Map<String,String> V7_CONTRACT=flatten(YamlData.parse(ConfigFiles.resource("config-migrations/messages-v7.yml"),"bundled messages v7"));
     private final Map<String,String> templates;
     private final UnaryOperator<String> display;
     private Messages(Map<String,String> templates) { this(templates,UnaryOperator.identity()); }
@@ -30,6 +31,7 @@ public final class Messages {
             String value=templates.get(entry.getKey());
             if(value==null) throw ConfigException.at("messages.yml",entry.getKey(),"is missing");
             Set<String> allowed=placeholders(entry.getValue());
+            allowed.addAll(placeholders(V7_CONTRACT.getOrDefault(entry.getKey(),"")));
             // v1 custom templates may keep these deprecated placeholders; their values are now empty.
             if(entry.getKey().equals("commands.confirm-delete")) allowed.addAll(Set.of("token","id","seconds"));
             if(entry.getKey().equals("selection.preview")) allowed.add("command");
@@ -37,6 +39,7 @@ public final class Messages {
             if(entry.getKey().equals("commands.list-entry")) allowed.add("id");
             if(entry.getKey().equals("commands.bounds")) allowed.add("bounds");
             if(entry.getKey().equals("commands.trust-list")) allowed.add("grants");
+            if(entry.getKey().equals("success.unclaimed-all")) allowed.add("count");
             if(!allowed.containsAll(placeholders(value))) throw ConfigException.at("messages.yml",entry.getKey(),"references an unsupported placeholder; use placeholders from the bundled template");
         }
         return new Messages(templates);

@@ -56,6 +56,19 @@ class SqliteStoreTest {
             }
         }
     }
+    @Test void unclaimAllPersistsAcrossWorldsWithoutDeletingAnotherOwnersTreeOrBalances() throws Exception {
+        Path database=directory.resolve("claims.db"); Claim first=root(0,9),child=child(first,1,5);
+        Claim second=new Claim(UUID.randomUUID(),UUID.randomUUID(),OWNER,null,new Bounds(0,9,0,9,null,null),true,1,0,Map.of(),Map.of());
+        Claim other=new Claim(UUID.randomUUID(),WORLD,STRANGER,null,new Bounds(20,29,20,29,null,null),true,1,0,Map.of(Subject.PUBLIC,Trust.ACCESS),Map.of(Flag.PVP,"allow"));
+        Claim otherChild=new Claim(UUID.randomUUID(),WORLD,null,other.id(),new Bounds(21,24,21,24,0,10),true,1,0,Map.of(),Map.of());
+        ClaimState before=new ClaimState(state(first,child,second,other,otherChild).claims(),Map.of(OWNER,new ClaimState.Account(1,2)));
+        ClaimState after=ClaimService.unclaimAll(before,OWNER);
+        try(SqliteStore store=new SqliteStore(database)) { store.save(ClaimState.empty(),before); store.save(before,after); }
+        try(SqliteStore store=new SqliteStore(database)) {
+            assertEquals(after,store.load()); assertEquals(Set.of(other.id(),otherChild.id()),store.load().claims().keySet());
+            assertEquals(before.accounts(),store.load().accounts());
+        }
+    }
     @Test void unknownSchemaFailsWithoutReinitializing() throws Exception {
         Path db=directory.resolve("claims.db");
         try(SqliteStore ignored=new SqliteStore(db)) { }

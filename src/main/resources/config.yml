@@ -13,6 +13,10 @@ tools:
 selection-timeout-seconds: 120
 # How long selection and inspection borders repeat (0 disables particles; maximum 300).
 particle-duration-seconds: 10
+# Particle border colors. Use quoted #RRGGBB hex colors, then /claima reload.
+border-colors:
+  parent: '#FFFF00'
+  child: '#00FFFF'
 disabled-worlds: []
 # Missing flags use built-in claim defaults; wilderness is permissive.
 # Values here also apply to wilderness. Owner overrides cannot defeat enforced values.
@@ -71,4 +75,4 @@ flags:
 worlds: {}
 
 # Independent configuration schema version. Managed automatically; do not edit.
-config-version: 5
+config-version: 6

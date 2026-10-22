@@ -13,7 +13,7 @@ class HumanNamesTest {
     @Test void ownerWorldAndClaimReferencesAreHumanReadable() {
         Claim root=root(0,9); HumanNames names=names(state(root));
         String output=names.replaceIdentifiers("owner="+OWNER+" world="+WORLD+" claim="+root.id());
-        assertTrue(output.contains("owner=Alex")); assertTrue(output.contains("world=world")); assertTrue(output.contains("Alex (world:"));
+        assertTrue(output.contains("owner=Alex")); assertTrue(output.contains("world=world")); assertTrue(output.contains("Alex at 0, 0 (world)"));
         assertFalse(output.contains(OWNER.toString())); assertFalse(output.contains(root.id().toString()));
     }
     @Test void missingPlayerUsesFriendlyFallbackWithoutExposingIdentifier() {
@@ -30,7 +30,7 @@ class HumanNamesTest {
     }
     @Test void capturedDeletedClaimDescriptionSurvivesRemoval() {
         Claim root=root(0,9); String description=names(state(root)).claim(root);
-        Messages messages=Messages.defaults().withDisplay(names(ClaimState.empty())::replaceIdentifiers);
-        assertTrue(messages.lines(Notice.of("success.deleted","id",description)).getFirst().contains("Alex (world:"));
+        Messages messages=Messages.from(org.saltymc.config.ConfigFiles.messagesFile().prepare("success:\n  deleted: 'Deleted {id}'\nconfig-version: 8\n".getBytes(java.nio.charset.StandardCharsets.UTF_8)).document()).withDisplay(names(ClaimState.empty())::replaceIdentifiers);
+        assertTrue(messages.lines(Notice.of("success.deleted","id",description)).getFirst().contains("Alex at 0, 0 (world)"));
     }
 }

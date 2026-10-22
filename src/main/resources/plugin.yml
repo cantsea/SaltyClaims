@@ -14,3 +14,6 @@ commands:
   claima:
     description: Administrative claim commands.
     usage: /claima help
+  unclaim:
+    description: Remove your current claim or all of your claims.
+    usage: /unclaim [all]

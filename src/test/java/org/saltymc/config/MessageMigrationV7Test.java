@@ -12,7 +12,7 @@ class MessageMigrationV7Test {
         Messages messages=Messages.from(candidate.document());
         assertTrue(messages.text("commands.list-entry").contains("{corner1}"));
         assertTrue(messages.text("commands.bounds").startsWith("Size:"));
-        assertEquals("Trust on A:",messages.text("commands.trust-list","id","A"));
+        assertEquals("",messages.text("commands.trust-list","id","A"));
         assertFalse(ConfigFiles.messagesFile().prepare(candidate.output()).changed());
         candidate=ConfigFiles.messagesFile().prepare("commands:\n  list-entry: 'My {id} {area} {world}'\n  bounds: 'My {bounds} {children}'\n  trust-list: 'My {id} {grants}'\nconfig-version: 6\n".getBytes(StandardCharsets.UTF_8));
         messages=Messages.from(candidate.document());
