@@ -8,6 +8,14 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.saltymc.Fixtures.*;
 
 class UnclaimTest {
+    @Test void serverManagedModeProtectsParentsButAllowsOwnedChildRemoval() {
+        Claim parent=root(0,9),child=child(parent,1,5); ClaimState before=state(parent,child);
+        assertThrows(MessageException.class,()->ClaimService.unclaim(before,OWNER,parent.id(),true));
+        assertThrows(MessageException.class,()->ClaimService.unclaimAll(before,OWNER,true));
+        assertThrows(MessageException.class,()->ClaimService.unclaim(before,FRIEND,child.id(),true));
+        assertEquals(Map.of(parent.id(),parent),ClaimService.unclaim(before,OWNER,child.id(),true).claims());
+        assertTrue(ClaimService.unclaimAll(before,OWNER,false).claims().isEmpty());
+    }
     @Test void singleUnclaimSelectsChildFirstAndParentDeletionIncludesChildren() {
         Claim parent=root(0,9),child=child(parent,1,5); ClaimState before=state(parent,child);
         Claim selected=new ClaimIndex(before).at(WORLD,2,3,2);

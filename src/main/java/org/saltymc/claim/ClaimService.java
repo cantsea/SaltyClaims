@@ -15,6 +15,9 @@ public final class ClaimService {
         }
     }
     private ClaimService() { }
+    public static void requirePlayerGeometry(boolean parent,boolean serverManaged) {
+        if(parent&&serverManaged) throw new MessageException("errors.server-managed-claims");
+    }
     public static boolean canCreateChild(ClaimState state, Claim parent, UUID creator) {
         return parent.root() && state.trust(parent, creator).grants(Trust.MANAGE);
     }
@@ -57,10 +60,18 @@ public final class ClaimService {
         return new ClaimState(claims, state.accounts());
     }
     public static ClaimState unclaim(ClaimState state,UUID actor,UUID id) {
+        return unclaim(state,actor,id,false);
+    }
+    public static ClaimState unclaim(ClaimState state,UUID actor,UUID id,boolean serverManaged) {
         if(!state.owner(state.require(id)).equals(actor)) throw new MessageException("errors.owner-only");
+        requirePlayerGeometry(state.require(id).root(),serverManaged);
         return delete(state,id);
     }
     public static ClaimState unclaimAll(ClaimState state,UUID actor) {
+        return unclaimAll(state,actor,false);
+    }
+    public static ClaimState unclaimAll(ClaimState state,UUID actor,boolean serverManaged) {
+        if(serverManaged) throw new MessageException("errors.server-managed-claims");
         Set<UUID> roots=new HashSet<>();
         for(Claim claim:state.claims().values()) if(claim.root()&&actor.equals(claim.owner())) roots.add(claim.id());
         if(roots.isEmpty()) throw new MessageException("errors.no-owned-claims");

@@ -85,6 +85,14 @@ On upgrade, legacy explicit global/world rules are converted to boolean wilderne
 
 Use `/unclaim` to remove the child claim you are standing in, or the main claim when there is no child. Removing a main claim also removes its children. `/unclaim all` removes every claim you own across all worlds. Both apply immediately without confirmation, preserve your earned/bonus claim blocks, and release the used area. Permissions are `saltyclaims.command.unclaim` and `saltyclaims.command.unclaim.all` (both default true). The old player `/claim delete` commands are removed.
 
+Use `/claimblocks` anywhere to see your available, used, and total claim blocks. Total includes starting, earned and bonus blocks; only owned parent claim areas count as used. The command is player-only and requires `saltyclaims.command.claimblocks` (default true).
+
+## Server-managed claims
+
+Set server-manages-claims: true in config.yml for skyblock or another plugin-managed land system (default false). Players cannot create, resize or unclaim parent claims; /unclaim all and /claimblocks are disabled. Player help hides the unavailable commands, and /claim list omits claim-block balances. Existing parent protection, trust and editable flags remain active. Children can still be created, resized and unclaimed under their existing ownership/Manage and permission rules; configured world claiming switches, child limits and flags still apply.
+
+The child tool and inspection tool remain available. Use claiming: true for worlds where players should create children; server-managed mode still prevents player parent creation. Staff administration remains available. Other plugins can create parent claims through the Bukkit Services Manager API, bypassing player budgets and claiming switches while retaining geometry/world validation. See [Plugin API](docs/plugin-api.md) for a complete integration example and persistence/error guarantees.
+
 ## Administration
 
 ```text

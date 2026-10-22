@@ -27,7 +27,8 @@ public final class ConfigFiles {
                 new MigrationStep(5,"Add full flag and trust reference comments; preserve configured values",document->{}),
                 new MigrationStep(6,"Add configurable parent and child border colors; preserve supplied settings",document->{}),
                 new MigrationStep(7,"Replace typed flag policy with boolean claim defaults and editability",FlagMigrationV7::apply),
-                new MigrationStep(8,"Document independent child trust and flags; preserve configured defaults",document->{})
+                new MigrationStep(8,"Document independent child trust and flags; preserve configured defaults",document->{}),
+                new MigrationStep(9,"Add server-managed parent claim mode, disabled by default",document->{})
         ),Set.of("claim-flags"),Settings::from,Settings::completeFlags);
     }
     public static YamlFileSpec worldsFile(Supplier<Collection<String>> names) {
@@ -57,7 +58,9 @@ public final class ConfigFiles {
                     if("You cannot do that in this claim.".equals(protection.get("action-denied")))
                         protection.put("action-denied","You cannot do that here.");
                 }),
-                new MigrationStep(14,"Add trust-level help and self-trust rejection; preserve existing templates",document->{})
+                new MigrationStep(14,"Add trust-level help and self-trust rejection; preserve existing templates",document->{}),
+                new MigrationStep(15,"Add personal claim-block balance message; preserve existing templates",document->{}),
+                new MigrationStep(16,"Add server-managed mode guidance and denials; preserve existing templates",document->{})
         ),Set.of(),Messages::from);
     }
     public static ConfigurationPipeline<RuntimeConfiguration> pipeline(Path directory,Consumer<String> logger) {

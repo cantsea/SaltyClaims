@@ -12,6 +12,8 @@ import org.bukkit.event.*;
 import org.bukkit.event.player.PlayerLoginEvent;
 import org.bukkit.event.world.WorldLoadEvent;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.plugin.ServicePriority;
+import org.saltymc.api.*;
 import org.saltymc.claim.*;
 import org.saltymc.command.ClaimCommands;
 import org.saltymc.command.ClaimFlagCommands;
@@ -43,6 +45,7 @@ public final class SaltyClaims extends JavaPlugin implements Listener,SelectionM
     private boolean ready, busy, writeFailed;
     private volatile boolean closing;
     private SelectionManager selections;
+    private DefaultSaltyClaimsApi claimsApi;
     private final Set<UUID> bypass = new HashSet<>();
     private final Map<UUID, Long> lastDenial = new HashMap<>();
     private final HumanNames names=new HumanNames(this::state,id->Bukkit.getOfflinePlayer(id).getName(),
@@ -64,7 +67,7 @@ public final class SaltyClaims extends JavaPlugin implements Listener,SelectionM
         ClaimCommands commands = new ClaimCommands(this);
         selections = new SelectionManager(this,commands::commitSelection);
         commands.registerPermissions();
-        for (String name : List.of("claim", "claima", "unclaim", "claimflag", "claimflags", "trust", "untrust")) {
+        for (String name : List.of("claim", "claima", "unclaim", "claimflag", "claimflags", "trust", "untrust", "claimblocks")) {
             Objects.requireNonNull(getCommand(name)).setExecutor(commands);
             Objects.requireNonNull(getCommand(name)).setTabCompleter(commands);
         }
@@ -74,12 +77,25 @@ public final class SaltyClaims extends JavaPlugin implements Listener,SelectionM
         Bukkit.getPluginManager().registerEvents(new ProtectionListener(this), this);
         Bukkit.getScheduler().runTaskTimer(this, () -> { selections.expire(); commands.expire(); }, 200, 200);
         Bukkit.getScheduler().runTaskTimer(this,selections::tickPreviews,10,10);
+        if(ready()) {
+            claimsApi=new DefaultSaltyClaimsApi(new DefaultSaltyClaimsApi.Port() {
+                public boolean primaryThread() { return Bukkit.isPrimaryThread(); }
+                public Settings settings() { return SaltyClaims.this.settings(); }
+                public void validateWorld(UUID world,Bounds bounds) { validateClaimWorld(world,bounds); }
+                public void mutate(Function<ClaimState,ClaimState> operation,Runnable committed,Runnable failed) {
+                    SaltyClaims.this.mutate(Bukkit.getConsoleSender(),operation,Notice.of("success.api-created"),committed,failed);
+                }
+            });
+            Bukkit.getServicesManager().register(SaltyClaimsApi.class,claimsApi,this,ServicePriority.Normal);
+        }
         getLogger().info(ready ? "Loaded " + state.claims().size() + " claims." : "MAINTENANCE: claim data unavailable.");
     }
 
     @Override
     public void onDisable() {
         closing = true; ready = false;
+        Bukkit.getServicesManager().unregisterAll(this);
+        if(claimsApi!=null) claimsApi.close();
         if(selections!=null) selections.clear();
         if(benchmarkWorker!=null) benchmarkWorker.shutdownNow();
         if (worker == null) return;
@@ -108,6 +124,13 @@ public final class SaltyClaims extends JavaPlugin implements Listener,SelectionM
     public void showBounds(Player player,Bounds bounds,World world,boolean child) { selections.preview(player,bounds,world,child); }
     public boolean ready() { return ready && !closing; }
     public Claim at(Location l) { return index.at(l.getWorld().getUID(), l.getBlockX(), l.getBlockY(), l.getBlockZ()); }
+    public void validateClaimWorld(UUID worldId,Bounds bounds) {
+        World world=Bukkit.getWorld(worldId);
+        if(world==null) throw new MessageException("errors.world-unloaded");
+        if(!bounds.fullHeight()&&(bounds.minY()<world.getMinHeight()||bounds.maxY()>=world.getMaxHeight())) throw new MessageException("errors.world-height");
+        for(int x:new int[]{bounds.minX(),bounds.maxX()}) for(int z:new int[]{bounds.minZ(),bounds.maxZ()})
+            if(!world.getWorldBorder().isInside(new Location(world,x+0.5,world.getMinHeight(),z+0.5))) throw new MessageException("errors.world-border");
+    }
     public boolean bypass(Player p) { return bypass.contains(p.getUniqueId()) && p.hasPermission("saltyclaims.command.claima.bypass"); }
     public void setBypass(Player p, boolean enabled) {
         if (enabled) bypass.add(p.getUniqueId()); else bypass.remove(p.getUniqueId());
@@ -115,7 +138,7 @@ public final class SaltyClaims extends JavaPlugin implements Listener,SelectionM
     }
     public void forget(UUID player) { bypass.remove(player); lastDenial.remove(player); }
     public Policy.Value value(Claim c, Flag flag, World world) {
-        return Policy.resolve(state, c, flag, world.getName(), settings().claimFlags(), settings().worlds());
+        return Policy.resolve( c, flag, world.getName(), settings().claimFlags(), settings().worlds());
     }
     public Policy.Decision decision(Player p, Location location, Flag flag) {
         if (!ready()) return new Policy.Decision(false, messages().text("protection.maintenance"));

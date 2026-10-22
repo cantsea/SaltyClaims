@@ -4,9 +4,16 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.saltymc.flag.Flag;
 import java.nio.file.*;
+import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 
 class SettingsTest {
+    @Test void serverManagedModeDefaultsOffAndRequiresBooleanValues() throws Exception {
+        assertFalse(load("config-version: 8\n").serverManagesClaims());
+        assertTrue(load("server-manages-claims: true\n").serverManagesClaims());
+        for(String value:List.of("null","'true'","1","[]"))
+            assertThrows(ConfigException.class,()->load("server-manages-claims: "+value+"\n"));
+    }
     @TempDir Path directory;
     private Settings load(String yaml) throws Exception {
         Path path=directory.resolve("config.yml"); Files.writeString(path,yaml); return Settings.load(path.toFile());

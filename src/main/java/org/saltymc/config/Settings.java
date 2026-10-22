@@ -10,7 +10,8 @@ import java.util.*;
 
 /** Fully validated immutable settings; supplied values never use coercing/fallback getters. */
 public record Settings(ClaimService.Limits limits,Material selectionTool,Material childSelectionTool,Material inspectionTool,
-                       int sessionSeconds,int previewSeconds,Color parentBorderColor,Color childBorderColor,Map<Flag,ClaimFlag> claimFlags,Map<String,WorldSettings> worlds) {
+                       int sessionSeconds,int previewSeconds,Color parentBorderColor,Color childBorderColor,Map<Flag,ClaimFlag> claimFlags,Map<String,WorldSettings> worlds,
+                       boolean serverManagesClaims) {
     public Settings {
         Objects.requireNonNull(limits); Objects.requireNonNull(selectionTool); Objects.requireNonNull(childSelectionTool); Objects.requireNonNull(inspectionTool);
         Objects.requireNonNull(parentBorderColor); Objects.requireNonNull(childBorderColor);
@@ -38,7 +39,7 @@ public record Settings(ClaimService.Limits limits,Material selectionTool,Materia
         Map<String,Object> colors=section(data,"border-colors");
         Color parentColor=color(colors,"parent"),childColor=color(colors,"child");
         return new Settings(new ClaimService.Limits(starting,width,roots,children,area),select,childSelect,inspect,timeout,preview,parentColor,childColor,
-                flags(section(data,"claim-flags")),WorldSettings.from(worldDocument));
+                flags(section(data,"claim-flags")),WorldSettings.from(worldDocument),WorldSettings.bool(data.get("server-manages-claims"),"config.yml","server-manages-claims"));
     }
     public static void completeFlags(Map<String,Object> document) {
         WorldSettings.missing(document,"claim-flags",new LinkedHashMap<String,Object>());

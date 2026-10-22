@@ -17,6 +17,18 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.saltymc.Fixtures.*;
 
 class SelectionManagerTest {
+    @Test void serverManagedModeBlocksParentCreationAndResizeButKeepsChildTools() {
+        Harness h=new Harness(); h.serverManaged=true;
+        h.click(20,64,20); assertEquals(0,h.attempts); h.assertSelectionCleared();
+        Claim parent=root(0,9); h.state=state(parent);
+        h.click(0,64,0); assertEquals(0,h.attempts); h.assertSelectionCleared(); assertEquals(parent,h.state.require(parent.id()));
+        h.childClick(1,10,1); h.childClick(3,12,3);
+        Claim child=h.state.children(parent.id()).getFirst(); assertEquals(1,h.attempts);
+        h.childClick(1,10,1); assertEquals(child.id(),h.manager.session(h.player).resize);
+        h.childClick(0,9,0); assertEquals(2,h.attempts);
+        assertEquals(new Bounds(0,3,0,3,9,12),h.state.require(child.id()).bounds());
+        assertEquals(parent,h.state.require(parent.id()));
+    }
     /** Only material is needed here; avoid item registries supplied by a running Paper server. */
     private static ItemStack item(Material material) { return new ItemStack() { @Override public Material getType() { return material; } }; }
     @SuppressWarnings("unchecked") private static <T> T proxy(Class<T> type,java.util.function.BiFunction<String,Object[],Object> handler) {
@@ -53,7 +65,7 @@ class SelectionManagerTest {
         });
         final SelectionManager manager=new SelectionManager(this,this::commit,()->now);
         int attempts;
-        boolean storageBusy;
+        boolean storageBusy,serverManaged;
         Location point(int x,int y,int z) { return new Location(world,x,y,z); }
         void click(int x,int y,int z) { manager.selectCorner(player,point(x,y,z)); }
         void childClick(int x,int y,int z) { manager.selectCorner(player,point(x,y,z),true); }
@@ -75,7 +87,7 @@ class SelectionManagerTest {
             manager.finish(player);
         }
         public boolean ready() { return true; }
-        public Settings settings() { return new Settings(new ClaimService.Limits(100,3,20,100,1000000),Material.STICK,Material.BONE,Material.FEATHER,120,duration,parentColor,childColor,Map.of(),Map.of()); }
+        public Settings settings() { return new Settings(new ClaimService.Limits(100,3,20,100,1000000),Material.STICK,Material.BONE,Material.FEATHER,120,duration,parentColor,childColor,Map.of(),Map.of(),serverManaged); }
         public Messages messages() { return Messages.defaults(); }
         public ClaimState state() { return state; }
         public Claim at(Location location) { return new ClaimIndex(state).at(location.getWorld().getUID(),location.getBlockX(),location.getBlockY(),location.getBlockZ()); }

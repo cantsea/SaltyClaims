@@ -13,7 +13,7 @@ public final class Policy {
     }
     public record Decision(boolean allowed, String reason) { }
     private Policy() { }
-    public static Value resolve(ClaimState state, Claim c, Flag flag, String world,
+    public static Value resolve(Claim c, Flag flag, String world,
                                 Map<Flag, Settings.ClaimFlag> defaults, Map<String, WorldSettings> worlds) {
         if(c==null) return new Value(flag.behavior(worlds.getOrDefault(world,WorldSettings.defaults()).allows(flag),true),"world wilderness");
         Settings.ClaimFlag setting=defaults.getOrDefault(flag,new Settings.ClaimFlag(flag.actor(),false));

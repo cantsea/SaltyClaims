@@ -9,6 +9,14 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.saltymc.Fixtures.*;
 
 class ClaimViewTest {
+    @Test void claimBlocksIncludesStartingEarnedAndBonusAndChargesOnlyOwnedRoots() {
+        Claim root=root(0,9),child=child(root,1,5);
+        Claim other=new Claim(UUID.randomUUID(),WORLD,STRANGER,null,new Bounds(20,29,20,29,null,null),true,1,0,Map.of(),Map.of());
+        ClaimState state=new ClaimState(state(root,child,other).claims(),Map.of(OWNER,new ClaimState.Account(25,50)));
+        assertEquals("Claim blocks: 975 available, 100 used, 1075 total.",Messages.defaults().text(ClaimView.claimBlocks(state,OWNER,1000)));
+        assertEquals("Claim blocks: 1000 available, 0 used, 1000 total.",Messages.defaults().text(ClaimView.claimBlocks(ClaimState.empty(),OWNER,1000)));
+        assertEquals("Claim blocks: 0 available, 100 used, 10 total.",Messages.defaults().text(ClaimView.claimBlocks(state(root),OWNER,10)));
+    }
     @Test void rootAndThreeDimensionalChildShowInclusiveSizesAndBothCorners() {
         Claim root=root(-10,-1); var notice=ClaimView.details("commands.list-entry",root,"world","full height","Root",0);
         String line=Messages.defaults().text(notice);

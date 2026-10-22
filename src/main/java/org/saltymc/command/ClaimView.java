@@ -9,6 +9,11 @@ import org.saltymc.trust.*;
 /** Public dimensions/corners are normalized persisted bounds, never raw record debug text. */
 public final class ClaimView {
     private ClaimView() { }
+    public static Notice claimBlocks(ClaimState state,UUID owner,long starting) {
+        long total=state.accounts().getOrDefault(owner,new ClaimState.Account(0,0)).total(starting);
+        long used=state.used(owner);
+        return Notice.of("commands.claimblocks","total",total,"used",used,"available",Math.max(0,total-used));
+    }
     public static Map<Trust,List<String>> trustGroups(Claim claim,Function<Subject,String> names) {
         Map<Trust,List<String>> result=new LinkedHashMap<>();
         for(Trust level:List.of(Trust.ACCESS,Trust.CONTAINER,Trust.BUILD,Trust.MANAGE))

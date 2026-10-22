@@ -36,7 +36,7 @@ public final class ClaimFlagCommands implements CommandExecutor,TabCompleter {
                 &&player.hasPermission("saltyclaims.flag."+f.key())).toList();
     }
     private Policy.Value value(Claim claim,Flag flag,Player player) {
-        return Policy.resolve(plugin.state(),claim,flag,player.getWorld().getName(),plugin.settings().claimFlags(),plugin.settings().worlds());
+        return Policy.resolve(claim,flag,player.getWorld().getName(),plugin.settings().claimFlags(),plugin.settings().worlds());
     }
     private void list(Player player,Claim claim) {
         List<Flag> flags=editable(player);

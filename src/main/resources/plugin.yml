@@ -8,6 +8,9 @@ load: POSTWORLD
 authors: [ cantsea ]
 description: Lightweight full-height claims, 3D subdivisions, trust, and native flags.
 commands:
+  claimblocks:
+    description: Show your available, used and total claim blocks.
+    usage: /claimblocks
   claim:
     description: Player claim commands.
     usage: /claim help

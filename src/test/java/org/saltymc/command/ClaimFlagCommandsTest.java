@@ -16,6 +16,14 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.saltymc.Fixtures.*;
 
 class ClaimFlagCommandsTest {
+    @Test void serverManagedModeKeepsEditableClaimFlagsAvailable() {
+        Harness h=new Harness();
+        var data=YamlData.parse(ConfigFiles.resource("config.yml"),"test"); data.put("server-manages-claims",true);
+        var flags=YamlData.map(data.get("claim-flags"),"test","");
+        YamlData.map(flags.get("pvp"),"test","").put("player-editable",true); h.settings=Settings.from(data);
+        h.run("claimflags"); assertTrue(h.messages.getFirst().contains("pvp: false"));
+        h.run("claimflag","toggle","pvp"); assertEquals("true",h.state.require(h.root.id()).flags().get(Flag.PVP));
+    }
     @SuppressWarnings("unchecked") private static <T> T proxy(Class<T> type,BiFunction<String,Object[],Object> call) {
         return (T)Proxy.newProxyInstance(type.getClassLoader(),new Class<?>[]{type},(p,m,args)->switch(m.getName()) {
             case "equals"->p==args[0]; case "hashCode"->System.identityHashCode(p); default->call.apply(m.getName(),args);

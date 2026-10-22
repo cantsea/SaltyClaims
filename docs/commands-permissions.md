@@ -24,6 +24,7 @@ Player commands require a player sender. Context resolves to the child containin
 | --- | --- | --- | --- |
 | `/claim help` | Explain tools, selection, resizing and each trust level, then show authorized commands. | `saltyclaims.command.claim.help` | None |
 | `/claim info [owner]` | Show owner, both corners, size/area, and local trust groups for this claim. | `saltyclaims.command.claim.info` | Public summary; trust details only for owner/Manage |
+| `/claimblocks` | Show your available, used and total claim blocks from anywhere. | `saltyclaims.command.claimblocks` | Player only; own balance |
 | `/claim list` | List owned parents and their children with dimensions, area, both corners, and allowance. | `saltyclaims.command.claim.list` | Own claims |
 | `/unclaim` | Immediately remove the child here, otherwise the main claim and its children; no confirmation. | `saltyclaims.command.unclaim` | Owner; player only |
 | `/unclaim all` | Immediately remove all owned claims and children across all worlds; no confirmation. | `saltyclaims.command.unclaim.all` | Owner; player only |
@@ -52,6 +53,10 @@ Right-clicking claimed land with the selection tool shows its borders and owner 
 Trust editing uses standalone `/trust` and `/untrust`; inspection remains `/claim trustlist`. The old player trust/untrust subcommands are removed. The two new permissions are independent, default true, and do not inherit authorization from the former permission nodes. For example, `/trust Alex access` grants Access and `/trust Alex manage` grants Manage, with the latter remaining owner-only. Right-clicking the second tool corner immediately attempts creation or resizing through the same validation and save path as commands. Insufficient allowance, overlap, invalid geometry, and missing permissions reject the operation; both corners and the selected parent/resize target are cleared, so the next click starts a new selection. Selection tools enforce the corresponding create/resize/child-create permission.
 
 `/claim help` (also shown by bare `/claim`) explains claiming with the configured regular, child and inspection tools. Item names are shown in readable lowercase text, and the instructions cover two corners, inferred child height, resizing and automatic selection resets. Available commands follow, filtered by their individual permissions. `/claim tool` and its permission are removed, along with `/claim pos1`, `/claim pos2`, `/claim create`, and `/claim explain`. Help does not give items or start a selection. The existing `saltyclaims.command.claim.create` permission remains registered (default true) exclusively to authorize regular tool creation; the other removed command permissions are no longer registered.
+
+### Server-managed mode
+
+When server-manages-claims is true, players cannot create/resize parent claims or remove them via /unclaim; /unclaim all is blocked. The parent tool is disabled, including at owned corners. /claimblocks is disabled and omitted from help, and /claim list omits balance output. Children remain subject to their normal local trust/ownership, tool permissions, world claiming switch and configured limits. Claim flag and trust commands remain available. The mode does not remove staff administrative authority or block the plugin creation API. Switching the setting through reload clears existing tool selections. The default is false.
 
 ### Staff and console commands
 
@@ -95,6 +100,7 @@ Server-wide resets have their own command and confirmation, without owner/locati
 | `saltyclaims.command.claim.child.create` | `true` | Child-tool creation inside a parent owned or managed by the sender; no command route. |
 | `saltyclaims.command.trust` | `true` | Grant local trust, defaulting to Access; owner/Manage authority required. |
 | `saltyclaims.command.untrust` | `true` | Remove local grants; cannot target yourself as owner/manager. |
+| `saltyclaims.command.claimblocks` | `true` | Show own claim-block balance, including starting/earned/bonus and root area usage. |
 | `saltyclaims.command.claim.resize` | `true` | Resize owned claims with their matching tools; no player command route. |
 | `saltyclaims.command.claimflags` | `true` | List available flag edits in an owned claim. |
 | `saltyclaims.command.claimflag.toggle` | `true` | Toggle an eligible flag in an owned claim. |

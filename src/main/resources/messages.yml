@@ -4,6 +4,13 @@ prefix: '[SaltyClaims] '
 # {placeholders} are literal data: they cannot inject color codes or other placeholders.
 # Missing keys use the bundled default. Set a message to '' to suppress that response.
 commands:
+  help-tools-managed: 'Tools: {child-selection} for child claims, {inspection} to inspect.'
+  help-player-managed: |-
+    The server manages parent claims. You can create and manage children inside parents you own or manage.
+    Right-click two corners with the child tool. Same Y: full height; different Y: 3D.
+    To resize an owned child, click its corner with the child tool, then the new corner.
+    Switching away or a failed attempt clears your selection.
+  claimblocks: 'Claim blocks: {available} available, {used} used, {total} total.'
   no-editable-flags: 'You have no editable claim flags here.'
   test-started: 'Running claim tests in the background. This may take up to two minutes.'
   confirm-reset-all: 'Delete every claim? Type /claima reset all confirm within {seconds} seconds.'
@@ -58,6 +65,7 @@ selection:
   inspect: 'This land is owned by {owner}'
   resize: 'Choose the new corner to resize this claim.'
 success:
+  api-created: 'Plugin-created parent claim saved.'
   test: 'Tests passed. Report: {file}'
   unclaimed: '{type} removed.'
   unclaimed-all: 'Removed all your claims.'
@@ -100,6 +108,8 @@ labels:
   full-height: 'full height'
   claim-reference: '{owner} at {x}, {z} ({world})'
 errors:
+  server-managed-claims: 'The server manages parent claims. You can only create, resize or remove child claims.'
+  claimblocks-disabled: 'Claim blocks are disabled while the server manages claims.'
   self-trust: 'You cannot trust or untrust yourself in a claim you own or manage.'
   flag-locked: 'You do not have permission to edit that flag.'
   test-busy: 'A claim test is already running.'
@@ -174,4 +184,4 @@ errors:
   invalid-input: '{reason}'
 
 # Independent message-file schema version. Managed automatically; do not edit.
-config-version: 14
+config-version: 16

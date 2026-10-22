@@ -156,6 +156,7 @@ public final class SelectionManager implements Listener {
         if(!plugin.ready()) return;
         Session s=toolSession(p,childTool);
             try {
+                ClaimService.requirePlayerGeometry(!childTool,plugin.settings().serverManagesClaims());
                 Claim clicked=plugin.at(point);
                 selectParent(p,s,clicked);
                 if(clicked!=null) {

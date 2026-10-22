@@ -7,6 +7,18 @@ import java.util.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 class CommandPermissionsTest {
+    @Test void claimBlocksHasAnIndependentPermissionAndAppearsOnlyInAuthorizedHelp() {
+        ClaimCommands commands=new ClaimCommands(null); List<String> messages=new ArrayList<>();
+        commands.onCommand(sender(Set.of(),messages),command("claimblocks"),"claimblocks",new String[]{});
+        assertEquals(List.of("[SaltyClaims] You do not have permission to do that."),messages);
+        messages.clear();
+        var permitted=sender(Set.of(ClaimCommands.CLAIM_BLOCKS_PERMISSION,ClaimCommands.permission(false,"help")),messages);
+        commands.onCommand(permitted,command("claim"),"claim",new String[]{"help"});
+        assertTrue(messages.contains("[SaltyClaims] /claimblocks"));
+        assertTrue(commands.onTabComplete(permitted,command("claimblocks"),"claimblocks",new String[]{""}).isEmpty());
+        messages.clear(); commands.onCommand(permitted,command("claimblocks"),"claimblocks",new String[]{});
+        assertEquals(List.of("[SaltyClaims] Use this command in-game."),messages);
+    }
     @Test void cancelCommandIsRemovedFromExecutionHelpAndCompletion() {
         ClaimCommands commands=new ClaimCommands(null); List<String> messages=new ArrayList<>();
         var sender=sender(Set.of("saltyclaims.command.claim.cancel",ClaimCommands.permission(false,"help")),messages);

@@ -12,3 +12,5 @@ SaltyClaims is a Paper Minecraft plugin providing SQLite-backed full-height root
 - [Plugin plan](plugin-plan.md): original design, implementation status, and deferred features.
 
 This directory is tracked in Git. Keep it aligned with the implementation; label proposed behavior explicitly. Local AI working notes belong in the ignored root `AI/` directory.
+
+- [Plugin API](plugin-api.md): create parent claims for offline or online owners through Bukkit Services Manager, including skyblock integration.

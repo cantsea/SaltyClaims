@@ -1,4 +1,7 @@
 # Root claims cover full world height. Children may be full height or 3D.
+# Server-managed mode: plugins/staff manage parents; players can only manage children.
+# Disables player parent creation/resizing/unclaiming and claim-block balance displays.
+server-manages-claims: false
 claims:
   starting-blocks: 10000
   minimum-width: 3
@@ -125,4 +128,4 @@ claim-flags:
     player-editable: false
 
 # Independent configuration schema version. Managed automatically; do not edit.
-config-version: 8
+config-version: 9
