@@ -4,11 +4,11 @@
 
 Claims belong to one server at a time. Shared multi-server access is not required.
 
-Initial claims are full-height rectangles in the X/Z plane. A later release will add subdivisions or child claims that can have bounded 3D volumes.
+Root claims are full-height rectangles in the X/Z plane. Children can be full-height subdivisions or bounded 3D volumes.
 
 The hierarchy is limited to root -> child. A child's parent must be a root; a child can never contain another child. Enforce this invariant when loading and mutating claim data, with database validation as a second layer when implementing the schema.
 
-This document describes the planned implementation. The current plugin does not yet implement storage.
+SQLite schema v1, transactional delta saves, load validation, backups, and an in-memory index are implemented. This document records the storage contract; remaining roadmap choices are listed at the end.
 
 ## Storage layout
 
@@ -25,7 +25,7 @@ The initial design uses SQLite's standard rollback journal with `synchronous=FUL
 | `claim_flags` | Claim UUID, stable flag key, and explicitly configured value. |
 | `schema_migrations` | Applied schema versions. |
 
-Add `player_data` only when a feature requires persistent player-level data, such as claim allowance.
+`player_data` is implemented for earned and bonus allowance. Starting allowance comes from configuration; used area derives from root claims. Playtime accrual is not currently implemented.
 
 For the proposed GP-style allowance system, player records separate starting, earned, and bonus allowance; used area derives from committed roots. Claim mutations and related allowance changes must be transactionally consistent. See [Plugin plan](plugin-plan.md) for proposed feature semantics.
 
@@ -41,11 +41,11 @@ The proposed claim record includes:
 
 Represent full height explicitly through absent Y bounds, rather than storing a world's current height limits or artificial extreme values. Full-height claims therefore continue to cover the world's buildable height if world height limits change.
 
-The initial release accepts only parentless, full-height rectangles. Reserve the parent and Y fields in the storage model for the later child-claim feature; no child creation or inheritance behavior is implemented initially.
+The implementation accepts parentless full-height roots and full-height or bounded children. Root ownership is stored only on roots and derived for children. Trust inheritance is persisted per child; flags inherit independently.
 
 When child claims are introduced, require the same world as their parent, complete containment in the parent volume, and an acyclic parent relationship. Root claims cannot overlap in X/Z. Ancestor/descendant overlap is intentional. Ordinary block bounds are inclusive, so two regions cannot own the same boundary block unless they are in a permitted ancestor/descendant relationship.
 
-One child level is a confirmed requirement. The plugin plan additionally proposes no sibling 3D intersection, root ownership for all children, optional trust inheritance/restriction, independent flag inheritance, rejection of root resizes that exclude children, and confirmed transactional tree deletion. Stacked 3D siblings can share X/Z when their Y ranges are disjoint. Child ownership is derived from the root rather than maintained as an independently editable duplicate owner. These additional rules are proposed for the later child milestone.
+One child level is a confirmed requirement. The implementation enforces no sibling 3D intersection, root ownership for all children, optional trust inheritance/restriction, independent flag inheritance, rejection of root resizes that exclude children, and confirmed transactional tree deletion. Stacked 3D siblings can share X/Z when their Y ranges are disjoint. Child ownership is derived from the root rather than maintained as an independently editable duplicate owner.
 
 Use primary keys, uniqueness constraints, and foreign keys to enforce record identity and prevent orphaned trust or flag entries. Delete related claim data in the same transaction as its claim.
 
@@ -57,7 +57,7 @@ Store only explicit flag overrides. Missing overrides inherit the applicable con
 
 Load and validate persistent data before enabling claim operations and protection listeners. Build in-memory indexes by claim ID, owner UUID, and world/chunk. A location lookup checks candidate claims from the chunk index against exact bounds.
 
-The initial lookup matches root claims by X/Z regardless of Y. Future child lookups can use the same chunk candidates and additionally test Y bounds and ancestry. A single flat no-overlap rule must not be reused for future parent/child regions.
+The lookup matches root claims by X/Z regardless of Y and prefers a containing child using its exact Y limits when present. A flat no-overlap rule is not applied between a root and its children.
 
 Protection events must not perform database or filesystem I/O. Do not store per-block ownership records. Apply claim mutations and update all indexes on the server thread; the database worker receives immutable save data and does not access live Bukkit objects.
 
@@ -69,21 +69,23 @@ Protection events must not perform database or filesystem I/O. Do not store per-
 4. On successful commit, publish the change and update indexes on the server thread, then release reservations and report success.
 5. On failure, release reservations, retain the previous in-memory state, and report the failure.
 
+The implementation uses one global pending-operation slot as its reservation: no other mutation or backup is accepted until completion. This also reserves allowance and prevents concurrent overlap/trust/tree changes. Protection reads continue against the committed snapshot. It avoids a queue of conflicting requests; callers receive a retry message instead.
+
 Existing protection remains in force until a successful change is published. New claims become active after commit and publication. Bound the pending work queue and reject new mutations clearly if storage cannot keep up.
 
 ## Startup, shutdown, and recovery
 
-- Never interpret a database read or migration failure as an empty claims database. Report the error explicitly. The plugin plan proposes maintenance mode that denies normal logins and gameplay mutations rather than enabling an unprotected server; exact recovery access remains to be specified.
+- Never interpret a database read or migration failure as an empty claims database. Maintenance mode denies normal logins and gameplay mutations. `saltyclaims.admin.recovery` permits staff login but not mutations; repair and restart are required.
 - Keep loaded protection active if later writes fail, and reject mutations that cannot be persisted safely.
 - Validate loaded records, including bounds and overlapping claims; do not silently discard invalid records. Claims for unavailable worlds retain their world UUID and must not be reassigned by world name.
 - Use versioned, transactional schema migrations and create a consistent backup before changing an existing database schema.
 - On shutdown, stop accepting mutations and drain accepted storage work before closing the connection, with a bounded wait and explicit error reporting if work remains.
 - Produce backups through a supported consistent database backup mechanism or after fully closing the database. Avoid copying an actively written database file directly.
 
+Schema version uses SQLite `user_version` plus `schema_migrations`; newer schemas are rejected. Current backups use `VACUUM INTO` on the serialized database worker. An OS file lock prevents two plugin instances opening the same data directory. Integration tests cover rollback, restart round trips, cascade deletion, backup restoration, duplicate-instance rejection, and invalid stored data.
+
 ## Decisions still open
 
-- Review proposed child-claim and Manage delegation rules in the plugin plan before implementing those milestones.
-- Final native flag defaults and event-specific action classifications.
-- Claim allowance model and whether player-level records are needed.
-- Exact maintenance/recovery behavior when protection data cannot be loaded.
-- Backup retention and administrator-facing backup controls.
+- Optional allowance accrual and any future player-level data.
+- Automatic backup retention; backups are currently administrator-triggered and retained manually.
+- Detailed production profiling and live operational recovery acceptance.

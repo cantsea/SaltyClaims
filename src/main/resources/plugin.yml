@@ -6,3 +6,11 @@ api-version: '26.3'
 load: POSTWORLD
 
 authors: [ cantsea ]
+description: Lightweight full-height claims, 3D subdivisions, trust, and native flags.
+commands:
+  claim:
+    description: Player claim commands.
+    usage: /claim help
+  claima:
+    description: Administrative claim commands.
+    usage: /claima help

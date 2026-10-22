@@ -2,7 +2,9 @@
 
 ## Status and scope
 
-Planning document; none of the gameplay described here is implemented yet.
+Original design and roadmap. The first implementation now includes root and child claims, GP-style trust, native flags, SQLite, selection, commands, and protection adapters. [Code documentation](code-documentation.md), [Commands and permissions](commands-permissions.md), and [Protection coverage](protection-matrix.md) describe current behavior. Items labeled proposed/deferred below remain design context, not a guarantee that every roadmap detail is implemented.
+
+Implementation choices: 10,000 starting blocks, configurable root/child limits, no playtime accrual or spacing setting yet, one globally pending storage operation rather than a multi-request reservation queue, manual backups/retention, and programmatic per-subcommand permissions. Live Paper startup/multiplayer protection acceptance and detailed server profiling are still required. Source was written independently; no GP code was copied.
 
 Confirmed requirements are single-server storage, lightweight protection, full-height rectangular root claims, native flags, GP-style trust, and later subdivisions/child claims that can be 3D. The hierarchy has exactly one subdivision level: a root can contain children, but a child cannot contain another child. Other choices below are proposed defaults, not additional confirmed requirements.
 

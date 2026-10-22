@@ -1,0 +1,23 @@
+# Root claims cover full world height. Children may be full height or 3D.
+claims:
+  starting-blocks: 10000
+  minimum-width: 3
+  maximum-roots: 20
+  maximum-children: 100
+  maximum-area: 1000000
+# Allowance accrual is not enabled; admins can adjust bonus blocks.
+tools:
+  selection: GOLDEN_SHOVEL
+  inspection: STICK
+selection-timeout-seconds: 120
+disabled-worlds: []
+# Missing flags use built-in claim defaults; wilderness is permissive.
+# Values here also apply to wilderness. Owner overrides cannot defeat enforced values.
+flags:
+  defaults: {}
+  enforced: {}
+# World names map directly to flag defaults, e.g. world: {pvp: deny}
+worlds: {}
+
+# Independent configuration schema version. Managed automatically; do not edit.
+config-version: 1
